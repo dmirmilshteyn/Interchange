@@ -28,6 +28,8 @@ namespace Interchange
         int SequenceNumber;
         int AckNumber;
 
+        TaskCompletionSource<bool> connectTcs;
+
         public Node() {
             // TODO: Not actually random yet
             Random random = new Random();
@@ -74,6 +76,10 @@ namespace Interchange
 
             await ListenAsync(IPAddress.Any, 0);
             await SendInternalPacket(endPoint, MessageType.Syn);
+
+            connectTcs = new TaskCompletionSource<bool>();
+
+            await connectTcs.Task;
         }
 
         private async Task PerformSend(SocketAsyncEventArgs e) {
@@ -139,10 +145,11 @@ namespace Interchange
                                 await SendAckPacket(e.RemoteEndPoint);
 
                                 connection.State = ConnectionState.Connected;
-
                                 if (ProcessConnected != null) {
                                     ProcessConnected(e.RemoteEndPoint);
                                 }
+
+                                connectTcs.TrySetResult(true);
                             } else {
                                 // No, something else happened
                                 throw new NotImplementedException();
