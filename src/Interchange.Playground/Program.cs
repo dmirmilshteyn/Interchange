@@ -14,11 +14,13 @@ namespace Interchange.Playground
             node.ProcessConnected = HandleConnected;
             await node.ListenAsync(IPAddress.Any, 5000);
 
+            IPEndPoint serverEndPoint = new IPEndPoint(IPAddress.Loopback, 5000);
+
             Node clientNode = new Node();
             clientNode.ProcessConnected = HandleClientConnected;
-            await clientNode.Connect(new IPEndPoint(IPAddress.Loopback, 5000));
+            await clientNode.Connect(serverEndPoint);
 
-            await node.SendTo(new IPEndPoint(IPAddress.Loopback, 55056), new byte[] { 65, 66, 67, 68, 69 });
+            await clientNode.SendData(serverEndPoint, new byte[] { 40, 41, 42, 43, 44 });
 
             while (true) {
                 await Task.Delay(1);

@@ -61,6 +61,10 @@ namespace Interchange
             await PerformSend(writeEventArgs);
         }
 
+        public async Task SendData(EndPoint endPoint, byte[] buffer) {
+            await SendReliableDataPacket(endPoint, buffer);
+        }
+
         public async Task Connect(EndPoint endPoint) {
             Connection connection = new Connection(endPoint);
             if (!connections.TryAdd(endPoint, connection)) {
@@ -154,6 +158,16 @@ namespace Interchange
                             }
                             break;
                         }
+                    case MessageType.ReliableData:
+                        {
+                            ushort size = (ushort)BitConverter.ToInt16(segment.Array, segment.Offset + 1 + 16);
+
+                            ArraySegment<byte> dataBuffer = new ArraySegment<byte>(segment.Array, segment.Offset + 1 + 16 + 16, size);
+                            if (ProcessIncomingMessageAction != null) {
+                                ProcessIncomingMessageAction(dataBuffer);
+                            }
+                            break;
+                        }
                 }
             }
 
@@ -211,6 +225,23 @@ namespace Interchange
             Interlocked.Increment(ref AckNumber);
 
             await SendTo(endPoint, buffer);
+        }
+
+        private async Task SendReliableDataPacket(EndPoint endPoint, byte[] buffer) {
+            byte[] packet = new byte[1 + 16 + 16 + buffer.Length];
+            packet[0] = (byte)MessageType.ReliableData;
+
+            // TODO: Remove the unneeded byte[] allocation
+            byte[] sqnBytes = BitConverter.GetBytes((ushort)SequenceNumber);
+            Buffer.BlockCopy(sqnBytes, 0, packet, 1, sqnBytes.Length);
+            Interlocked.Increment(ref SequenceNumber);
+
+            byte[] sizeBytes = BitConverter.GetBytes((ushort)buffer.Length);
+            Buffer.BlockCopy(sizeBytes, 0, packet, 1 + 16, sizeBytes.Length);
+
+            Buffer.BlockCopy(buffer, 0, packet, 1 + 16 + 16, buffer.Length);
+
+            await SendTo(endPoint, packet);
         }
     }
 }
