@@ -4,18 +4,34 @@
   "authors": [ "Daniel Mirmilshteyn" ],
   "tags": [ "" ],
   "projectUrl": "https://github.com/dmirmilshteyn/Interchange",
-  "licenseUrl": "",
+  "licenseUrl": "https://github.com/dmirmilshteyn/Interchange/blob/master/LICENSE.md",
 
   "frameworks": {
-    "net451": { },
-    "dnx451": { },
-    "dnxcore50": {
+    "dotnet": {
+      "compilationOptions": {
+        "define": [ "DOTNET" ]
+      },
       "dependencies": {
         "Microsoft.CSharp": "4.0.1-beta-23409",
         "System.Collections": "4.0.11-beta-23409",
         "System.Linq": "4.0.1-beta-23409",
         "System.Runtime": "4.0.21-beta-23409",
-        "System.Threading": "4.0.11-beta-23409"
+        "System.Threading": "4.0.11-beta-23409",
+        "System.Net.Primitives": "4.0.11-beta-23409",
+        "System.Net.Sockets": "4.1.0-beta-23409"
+      }
+    },
+    "net45": {
+      "compilationOptions": {
+        "define": [ "DOTNET" ]
+      }
+    },
+    "netcore451": {
+      "compilationOptions": {
+        "define": [ "WINRT" ]
+      },
+      "dependencies": {
+        "Microsoft.CSharp": "4.0.1-beta-23409"
       }
     }
   }
