@@ -20,19 +20,6 @@
         "System.Net.Primitives": "4.0.11-beta-23409",
         "System.Net.Sockets": "4.1.0-beta-23409"
       }
-    },
-    "net45": {
-      "compilationOptions": {
-        "define": [ "DOTNET" ]
-      }
-    },
-    "netcore451": {
-      "compilationOptions": {
-        "define": [ "WINRT" ]
-      },
-      "dependencies": {
-        "Microsoft.CSharp": "4.0.1-beta-23409"
-      }
     }
   }
 }
