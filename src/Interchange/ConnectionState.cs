@@ -8,6 +8,7 @@ namespace Interchange
     public enum ConnectionState
     {
         None,
-        HandshakeInitiated
+        HandshakeInitiated,
+        Connected
     }
 }

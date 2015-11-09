@@ -104,7 +104,7 @@ namespace Interchange
 
             if (segment.Count > 0) {
                 MessageType messageType = (MessageType)segment.Array[segment.Offset];
-                ushort sqnNumber = (ushort)BitConverter.ToInt16(segment.Array, segment.Offset + 1);
+                ushort sqnNumber = ReadSequenceNumber(segment, 1);
 
                 switch (messageType) {
                     case MessageType.Syn:
@@ -128,11 +128,13 @@ namespace Interchange
                             // Check: did we send a syn?
                             Connection connection;
                             if (connections.TryGetValue(e.RemoteEndPoint, out connection)) {
-                                AckNumber = (ushort)BitConverter.ToInt16(segment.Array, segment.Offset + 17);
+                                AckNumber = ReadSequenceNumber(segment, 17);
                                 Interlocked.Increment(ref AckNumber);
 
                                 // Syn-ack received, confirm and establish the connection
                                 await SendAckPacket(e.RemoteEndPoint);
+
+                                connection.State = ConnectionState.Connected;
 
                                 if (ProcessConnected != null) {
                                     ProcessConnected(e.RemoteEndPoint);
@@ -161,6 +163,10 @@ namespace Interchange
 
             // Continue listening for new packets
             await PerformReceive(e);
+        }
+
+        private ushort ReadSequenceNumber(ArraySegment<byte> segment, int offset) {
+            return (ushort)BitConverter.ToInt16(segment.Array, segment.Offset + offset);
         }
 
         private async Task HandlePacketSent(SocketAsyncEventArgs e) {
