@@ -8,13 +8,15 @@ namespace Interchange.Playground
 {
     public class Program
     {
-        public void Main(string[] args) {
+        public async Task Main(string[] args) {
             Node node = new Node();
             node.ProcessIncomingMessageAction = HandleIncomingPacket;
-            node.ListenAsync(IPAddress.Any, 5000).Wait();
+            await node.ListenAsync(IPAddress.Any, 5000);
+
+            await node.SendTo(new IPEndPoint(IPAddress.Loopback, 55056), new byte[] { 65, 66, 67, 68, 69 });
 
             while (true) {
-                Task.Delay(1);
+                await Task.Delay(1);
             }
         }
 
