@@ -116,7 +116,7 @@ namespace Interchange
                             if (connections.TryAdd(e.RemoteEndPoint, connection)) {
                                 // TODO: All good, raise events
                                 connection.State = ConnectionState.HandshakeInitiated;
-                                await SendInternalPacket(e.RemoteEndPoint, MessageType.SynAck);
+                                await SendSynAckPacket(e.RemoteEndPoint);
                             } else {
                                 // Couldn't add to the connections dictionary - uh oh!
                                 throw new NotImplementedException();
@@ -128,7 +128,7 @@ namespace Interchange
                             // Check: did we send a syn?
                             Connection connection;
                             if (connections.TryGetValue(e.RemoteEndPoint, out connection)) {
-                                AckNumber = BitConverter.ToInt16(segment.Array, segment.Offset + 17);
+                                AckNumber = (ushort)BitConverter.ToInt16(segment.Array, segment.Offset + 17);
                                 Interlocked.Increment(ref AckNumber);
 
                                 // Syn-ack received, confirm and establish the connection
@@ -145,8 +145,10 @@ namespace Interchange
                         }
                     case MessageType.Ack:
                         {
-                            if (ProcessConnected != null) {
-                                ProcessConnected(e.RemoteEndPoint);
+                            if (sqnNumber == AckNumber + 1) {
+                                if (ProcessConnected != null) {
+                                    ProcessConnected(e.RemoteEndPoint);
+                                }
                             }
                             break;
                         }
