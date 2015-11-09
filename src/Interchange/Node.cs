@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Interchange.Headers;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -114,31 +115,18 @@ namespace Interchange
 
             if (segment.Count > 0) {
                 MessageType messageType = (MessageType)segment.Array[segment.Offset];
-                ushort sqnNumber = ReadSequenceNumber(segment, 1);
 
-                switch (messageType) {
-                    case MessageType.Syn:
-                        {
-                            AckNumber = sqnNumber;
-                            Interlocked.Increment(ref AckNumber);
-                            // Received a connection attempt
-                            Connection connection = new Connection(e.RemoteEndPoint);
-                            if (connections.TryAdd(e.RemoteEndPoint, connection)) {
-                                // TODO: All good, raise events
-                                connection.State = ConnectionState.HandshakeInitiated;
-                                await SendSynAckPacket(e.RemoteEndPoint);
-                            } else {
-                                // Couldn't add to the connections dictionary - uh oh!
-                                throw new NotImplementedException();
-                            }
-                            break;
-                        }
-                    case MessageType.SynAck:
-                        {
-                            // Check: did we send a syn?
-                            Connection connection;
-                            if (connections.TryGetValue(e.RemoteEndPoint, out connection)) {
-                                AckNumber = ReadSequenceNumber(segment, 17);
+                Connection connection;
+                if (connections.TryGetValue(e.RemoteEndPoint, out connection)) {
+                    switch (messageType) {
+                        case MessageType.Syn:
+                            // TODO: Reject the connection, already connected!
+                            throw new NotImplementedException();
+                        case MessageType.SynAck:
+                            {
+                                var header = SynAckHeader.FromSegment(segment);
+
+                                AckNumber = header.AckNumber;
                                 Interlocked.Increment(ref AckNumber);
 
                                 // Syn-ack received, confirm and establish the connection
@@ -150,31 +138,56 @@ namespace Interchange
                                 }
 
                                 connectTcs.TrySetResult(true);
-                            } else {
-                                // No, something else happened
+                            }
+                            break;
+                        case MessageType.Ack:
+                            {
+                                var header = AckHeader.FromSegment(segment);
+
+                                if (header.SequenceNumber == AckNumber + 1) {
+                                    if (ProcessConnected != null) {
+                                        ProcessConnected(e.RemoteEndPoint);
+                                    }
+                                }
+                                break;
+                            }
+                        case MessageType.ReliableData:
+                            {
+                                var header = ReliableDataHeader.FromSegment(segment);
+
+                                ArraySegment<byte> dataBuffer = new ArraySegment<byte>(segment.Array, segment.Offset + 1 + 16 + 16, header.PayloadSize);
+                                if (ProcessIncomingMessageAction != null) {
+                                    ProcessIncomingMessageAction(dataBuffer);
+                                }
+                                break;
+                            }
+                    }
+                } else {
+                    switch (messageType) {
+                        case MessageType.Syn:
+                            {
+                                var header = SynHeader.FromSegment(segment);
+
+                                AckNumber = header.SequenceNumber;
+                                Interlocked.Increment(ref AckNumber);
+                                // Received a connection attempt
+                                connection = new Connection(e.RemoteEndPoint);
+                                if (connections.TryAdd(e.RemoteEndPoint, connection)) {
+                                    // TODO: All good, raise events
+                                    connection.State = ConnectionState.HandshakeInitiated;
+                                    await SendSynAckPacket(e.RemoteEndPoint);
+                                } else {
+                                    // Couldn't add to the connections dictionary - uh oh!
+                                    throw new NotImplementedException();
+                                }
+                                break;
+                            }
+                        case MessageType.SynAck:
+                            {
+                                // TODO: Got a synack, but no local connection has been initiated
                                 throw new NotImplementedException();
                             }
-                            break;
-                        }
-                    case MessageType.Ack:
-                        {
-                            if (sqnNumber == AckNumber + 1) {
-                                if (ProcessConnected != null) {
-                                    ProcessConnected(e.RemoteEndPoint);
-                                }
-                            }
-                            break;
-                        }
-                    case MessageType.ReliableData:
-                        {
-                            ushort size = (ushort)BitConverter.ToInt16(segment.Array, segment.Offset + 1 + 16);
-
-                            ArraySegment<byte> dataBuffer = new ArraySegment<byte>(segment.Array, segment.Offset + 1 + 16 + 16, size);
-                            if (ProcessIncomingMessageAction != null) {
-                                ProcessIncomingMessageAction(dataBuffer);
-                            }
-                            break;
-                        }
+                    }
                 }
             }
 
@@ -184,10 +197,6 @@ namespace Interchange
 
             // Continue listening for new packets
             await PerformReceive(e);
-        }
-
-        private ushort ReadSequenceNumber(ArraySegment<byte> segment, int offset) {
-            return (ushort)BitConverter.ToInt16(segment.Array, segment.Offset + offset);
         }
 
         private async Task HandlePacketSent(SocketAsyncEventArgs e) {
