@@ -31,10 +31,12 @@ namespace Interchange
 
         TaskCompletionSource<bool> connectTcs;
 
+        PacketTransmissionController packetTransmissionController;
+
         public Node() {
             // TODO: Not actually random yet
             Random random = new Random();
-            SequenceNumber = random.Next(0, ushort.MaxValue);
+            SequenceNumber = random.Next(ushort.MaxValue, ushort.MaxValue + 1);
 
             buffer = new byte[BufferSize];
 
@@ -46,6 +48,7 @@ namespace Interchange
             writeEventArgs = new SocketAsyncEventArgs();
 
             connections = new ConcurrentDictionary<EndPoint, Connection>();
+            packetTransmissionController = new PacketTransmissionController(SequenceNumber);
 
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         }
@@ -144,7 +147,9 @@ namespace Interchange
                             {
                                 var header = AckHeader.FromSegment(segment);
 
-                                if (header.SequenceNumber == AckNumber + 1) {
+                                packetTransmissionController.RecordAck(header.SequenceNumber);
+
+                                if (header.SequenceNumber == (ushort)(AckNumber + 1)) {
                                     if (ProcessConnected != null) {
                                         ProcessConnected(e.RemoteEndPoint);
                                     }
@@ -156,6 +161,9 @@ namespace Interchange
                                 var header = ReliableDataHeader.FromSegment(segment);
 
                                 ArraySegment<byte> dataBuffer = new ArraySegment<byte>(segment.Array, segment.Offset + 1 + 16 + 16, header.PayloadSize);
+
+                                await SendAckPacket(e.RemoteEndPoint);
+
                                 if (ProcessIncomingMessageAction != null) {
                                     ProcessIncomingMessageAction(dataBuffer);
                                 }
@@ -203,14 +211,21 @@ namespace Interchange
 
         }
 
+        private async Task SendToSequenced(EndPoint endPoint, int sequenceNumber, byte[] buffer) {
+            packetTransmissionController.RecordPacketTransmission(sequenceNumber, buffer);
+            await SendTo(endPoint, buffer);
+        }
+
         private async Task SendInternalPacket(EndPoint endPoint, MessageType messageType) {
             byte[] buffer = new byte[1 + 16];
             buffer[0] = (byte)messageType;
 
-            // TODO: Remove the unneeded byte[] allocation
-            byte[] sqnBytes = BitConverter.GetBytes((ushort)SequenceNumber);
-            Buffer.BlockCopy(sqnBytes, 0, buffer, 1, sqnBytes.Length);
+            int sequenceNumber = SequenceNumber;
             Interlocked.Increment(ref SequenceNumber);
+
+            // TODO: Remove the unneeded byte[] allocation
+            byte[] sqnBytes = BitConverter.GetBytes((ushort)sequenceNumber);
+            Buffer.BlockCopy(sqnBytes, 0, buffer, 1, sqnBytes.Length);
 
             await SendTo(endPoint, buffer);
         }
@@ -219,26 +234,30 @@ namespace Interchange
             byte[] buffer = new byte[1 + 16 + 16];
             buffer[0] = (byte)MessageType.SynAck;
 
-            // TODO: Remove the unneeded byte[] allocation
-            byte[] sqnBytes = BitConverter.GetBytes((ushort)SequenceNumber);
-            Buffer.BlockCopy(sqnBytes, 0, buffer, 1, sqnBytes.Length);
+            int sequenceNumber = SequenceNumber;
             Interlocked.Increment(ref SequenceNumber);
+
+            // TODO: Remove the unneeded byte[] allocation
+            byte[] sqnBytes = BitConverter.GetBytes((ushort)sequenceNumber);
+            Buffer.BlockCopy(sqnBytes, 0, buffer, 1, sqnBytes.Length);
 
             // TODO: Remove the unneeded byte[] allocation
             byte[] ackBytes = BitConverter.GetBytes((ushort)AckNumber);
             Buffer.BlockCopy(ackBytes, 0, buffer, 17, ackBytes.Length);
 
-            await SendTo(endPoint, buffer);
+            await SendToSequenced(endPoint, sequenceNumber, buffer);
         }
 
         private async Task SendAckPacket(EndPoint endPoint) {
             byte[] buffer = new byte[1 + 16];
             buffer[0] = (byte)MessageType.Ack;
 
-            // TODO: Remove the unneeded byte[] allocation
-            byte[] ackBytes = BitConverter.GetBytes((ushort)AckNumber);
-            Buffer.BlockCopy(ackBytes, 0, buffer, 1, ackBytes.Length);
+            int ackNumber = AckNumber;
             Interlocked.Increment(ref AckNumber);
+
+            // TODO: Remove the unneeded byte[] allocation
+            byte[] ackBytes = BitConverter.GetBytes((ushort)ackNumber);
+            Buffer.BlockCopy(ackBytes, 0, buffer, 1, ackBytes.Length);
 
             await SendTo(endPoint, buffer);
         }
@@ -247,17 +266,19 @@ namespace Interchange
             byte[] packet = new byte[1 + 16 + 16 + buffer.Length];
             packet[0] = (byte)MessageType.ReliableData;
 
-            // TODO: Remove the unneeded byte[] allocation
-            byte[] sqnBytes = BitConverter.GetBytes((ushort)SequenceNumber);
-            Buffer.BlockCopy(sqnBytes, 0, packet, 1, sqnBytes.Length);
+            int sequenceNumber = SequenceNumber;
             Interlocked.Increment(ref SequenceNumber);
+
+            // TODO: Remove the unneeded byte[] allocation
+            byte[] sqnBytes = BitConverter.GetBytes((ushort)sequenceNumber);
+            Buffer.BlockCopy(sqnBytes, 0, packet, 1, sqnBytes.Length);
 
             byte[] sizeBytes = BitConverter.GetBytes((ushort)buffer.Length);
             Buffer.BlockCopy(sizeBytes, 0, packet, 1 + 16, sizeBytes.Length);
 
             Buffer.BlockCopy(buffer, 0, packet, 1 + 16 + 16, buffer.Length);
 
-            await SendTo(endPoint, packet);
+            await SendToSequenced(endPoint, sequenceNumber, packet);
         }
     }
 }
