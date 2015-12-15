@@ -1,15 +1,13 @@
 {
-  "version": "1.0.0-alpha-1",
+  "version": "1.0.1-beta",
   "description": "Interchange Networking Library",
   "authors": [ "Daniel Mirmilshteyn" ],
   "tags": [ "" ],
   "projectUrl": "https://github.com/dmirmilshteyn/Interchange",
   "licenseUrl": "https://github.com/dmirmilshteyn/Interchange/blob/master/LICENSE.md",
   "frameworks": {
+    "dnx451": { },
     "dotnet": {
-      "compilationOptions": {
-        "define": [ "DOTNET" ]
-      },
       "dependencies": {
         "Microsoft.CSharp": "4.0.1-beta-23409",
         "System.Collections": "4.0.11-beta-23409",

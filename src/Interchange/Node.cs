@@ -69,6 +69,10 @@ namespace Interchange
             }
         }
 
+        public void Close() {
+            socket?.Dispose();
+        }
+
         public async Task ListenAsync(IPAddress localIPAddress, int port) {
             IPEndPoint ipEndPoint = new IPEndPoint(localIPAddress, port);
             socket.Bind(ipEndPoint);
@@ -105,16 +109,24 @@ namespace Interchange
         }
 
         private async Task PerformSend(SocketAsyncEventArgs e) {
-            bool willRaiseEvent = socket.SendToAsync(e);
-            if (!willRaiseEvent) {
-                await HandlePacketSent(e);
+            try {
+                bool willRaiseEvent = socket.SendToAsync(e);
+                if (!willRaiseEvent) {
+                    await HandlePacketSent(e);
+                }
+            } catch {
+                // TODO: Properly handle these exceptions
             }
         }
 
         private async Task PerformReceive(SocketAsyncEventArgs e) {
-            bool willRaiseEvent = socket.ReceiveFromAsync(e);
-            if (!willRaiseEvent) {
-                await HandlePacketReceived(e);
+            try {
+                bool willRaiseEvent = socket.ReceiveFromAsync(e);
+                if (!willRaiseEvent) {
+                    await HandlePacketReceived(e);
+                }
+            } catch {
+                // TODO: Properly handle these exceptions
             }
         }
 
