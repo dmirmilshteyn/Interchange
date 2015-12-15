@@ -22,21 +22,51 @@ namespace Interchange.Tests
             }
         }
 
-        [Fact]
-        public async Task SingleMessageTest() {
+        public static IEnumerable<object[]> MessageTestPayloads {
+            get {
+                yield return new object[] {
+                    new byte[][]
+                    {
+                        new byte[] { 40, 41, 42, 43, 44 },
+                    }
+                };
+
+                yield return new object[] {
+                    new byte[][]
+                    {
+                        new byte[] { 40, 41, 42, 43, 44 },
+                        new byte[] { 40, 41, 42, 43, 44, 45 }
+                    }
+                };
+
+                yield return new object[] {
+                    new byte[][]
+                    {
+                        new byte[] { 40, 41, 42, 43, 44 },
+                        new byte[] { 40, 41, 42, 43, 44, 45 },
+                        new byte[] { 40, 41, 42, 43, 44, 45, 46, 47, 48 }
+                    }
+                };
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(MessageTestPayloads))]
+        public async Task SimpleMessageTest(byte[][] payloads) {
             using (var server = new TestNode()) {
                 using (var client = new TestNode()) {
                     await server.ListenAsync();
                     await client.Connect();
 
-                    byte[] payload = new byte[] { 40, 41, 42, 43, 44 };
-                    await client.SendData(payload);
+                    for (int i = 0; i < payloads.Length; i++) {
+                        await client.SendData(payloads[i]);
+                        var result = await server.ReadMessage();
 
-                    var result = await server.ReadMessage();
-
-                    Assert.True(result.SequenceEqual(payload));
+                        Assert.True(result.SequenceEqual(payloads[i]));
+                    }
                 }
             }
         }
+
     }
 }
