@@ -10,37 +10,33 @@ namespace Interchange.Tests
     {
         [Fact]
         public async Task ConnectionTest() {
-            var server = new TestNode();
-            var client = new TestNode();
+            using (var server = new TestNode()) {
+                using (var client = new TestNode()) {
+                    await server.ListenAsync();
+                    await client.Connect();
 
-            await server.ListenAsync();
-            await client.Connect();
+                    var result = await server.ReadState();
 
-            var result = await server.ReadState();
-
-            server.Close();
-            client.Close();
-
-            Assert.Equal(result, TestNodeState.Connected);
+                    Assert.Equal(result, TestNodeState.Connected);
+                }
+            }
         }
 
         [Fact]
         public async Task SingleMessageTest() {
-            var server = new TestNode();
-            var client = new TestNode();
+            using (var server = new TestNode()) {
+                using (var client = new TestNode()) {
+                    await server.ListenAsync();
+                    await client.Connect();
 
-            await server.ListenAsync();
-            await client.Connect();
+                    byte[] payload = new byte[] { 40, 41, 42, 43, 44 };
+                    await client.SendData(payload);
 
-            byte[] payload = new byte[] { 40, 41, 42, 43, 44 };
-            await client.SendData(payload);
+                    var result = await server.ReadMessage();
 
-            var result = await server.ReadMessage();
-
-            server.Close();
-            client.Close();
-
-            Assert.True(result.SequenceEqual(payload));
+                    Assert.True(result.SequenceEqual(payload));
+                }
+            }
         }
     }
 }

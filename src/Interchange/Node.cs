@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace Interchange
 {
-    public class Node
+    public class Node : IDisposable
     {
         public static readonly int BufferSize = 1014;
 
@@ -36,6 +36,7 @@ namespace Interchange
         CancellationToken updateCancellationToken;
 
         bool client = false;
+        bool disposed;
 
         public Node() {
             // TODO: Not actually random yet
@@ -305,6 +306,13 @@ namespace Interchange
             Buffer.BlockCopy(buffer, 0, packet, 1 + 16 + 16, buffer.Length);
 
             await SendToSequenced(endPoint, sequenceNumber, packet);
+        }
+
+        public void Dispose() {
+            if (!disposed) {
+                disposed = true;
+                Close();
+            }
         }
     }
 }
