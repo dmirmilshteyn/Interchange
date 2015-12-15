@@ -6,26 +6,26 @@ using System.Threading.Tasks;
 
 namespace Interchange
 {
-    public class PacketTransmissionController
+    public class PacketTransmissionController<TTag>
     {
-        PacketTransmissionObject[] packetTransmissions;
+        PacketTransmissionObject<TTag>[] packetTransmissions;
         Queue<int> packetTransmissionOrder;
 
         int size;
-        Node node;
+        Node<TTag> node;
 
         public int SequenceNumber { get; private set; }
 
-        public PacketTransmissionController(Node node) {
+        public PacketTransmissionController(Node<TTag> node) {
             this.size = 1024;
 
             this.node = node;
 
-            packetTransmissions = new PacketTransmissionObject[size];
+            packetTransmissions = new PacketTransmissionObject<TTag>[size];
             packetTransmissionOrder = new Queue<int>();
         }
 
-        public void RecordPacketTransmission(ushort sequenceNumber, Connection connection, byte[] packet) {
+        public void RecordPacketTransmission(ushort sequenceNumber, Connection<TTag> connection, byte[] packet) {
             int position = (ushort)(sequenceNumber - connection.InitialSequenceNumber);
 
             packetTransmissions[position].Acked = false;
@@ -39,7 +39,7 @@ namespace Interchange
             System.Diagnostics.Debug.WriteLine("Send packet #" + ((ushort)sequenceNumber).ToString());
         }
 
-        public void RecordAck(Connection connection, int ackNumber) {
+        public void RecordAck(Connection<TTag> connection, int ackNumber) {
             ushort position = (ushort)(ackNumber - connection.InitialSequenceNumber);
 
             packetTransmissions[position].Acked = true;

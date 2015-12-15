@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 
 namespace Interchange
 {
-    public struct PacketTransmissionObject
+    public struct PacketTransmissionObject<TTag>
     {
         public bool Acked;
         public ushort SequenceNumber;
-        public Connection Connection;
+        public Connection<TTag> Connection;
         public byte[] Buffer;
         public long LastTransmissionTime;
     }

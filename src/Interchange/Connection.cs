@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Interchange
 {
-    public class Connection
+    public class Connection<TTag>
     {
         public ConnectionState State { get; internal set; }
         public EndPoint RemoteEndPoint { get; private set; }
@@ -24,14 +24,16 @@ namespace Interchange
             get { return (ushort)ackNumber; }
         }
 
-        public PacketTransmissionController PacketTransmissionController { get; private set; }
+        public PacketTransmissionController<TTag> PacketTransmissionController { get; private set; }
 
-        public Connection(Node node, EndPoint remoteEndPoint) {
+        public TTag Tag { get; set; }
+
+        public Connection(Node<TTag> node, EndPoint remoteEndPoint) {
             this.RemoteEndPoint = remoteEndPoint;
 
             this.sequenceNumber = InitialSequenceNumber = 0;//random.Next(ushort.MaxValue, ushort.MaxValue + 1);
 
-            PacketTransmissionController = new PacketTransmissionController(node);
+            PacketTransmissionController = new PacketTransmissionController<TTag>(node);
         }
 
         public void IncrementSequenceNumber() {
