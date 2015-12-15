@@ -29,6 +29,8 @@ namespace Interchange.Playground
 
             await clientNode2.SendDataAsync(clientNode2.RemoteConnection, new byte[] { 15, 16, 17, 18 });
 
+            node.Dispose();
+
             while (true) {
                 await Task.Delay(1);
             }

@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -12,14 +13,12 @@ namespace Interchange
 {
     public class Node : IDisposable
     {
-        public static readonly int BufferSize = 1014;
+        private readonly EndPoint LocalEndPoint = new IPEndPoint(IPAddress.Any, 0);
 
         Socket socket;
 
-        byte[] buffer;
-
-        SocketAsyncEventArgs readEventArgs;
-        SocketAsyncEventArgs writeEventArgs;
+        ObjectPool<byte[]> bufferPool;
+        ObjectPool<SocketAsyncEventArgs> socketEventArgsPool;
 
         public Action<ArraySegment<byte>> ProcessIncomingMessageAction { get; set; }
         public Action<EndPoint> ProcessConnected { get; set; }
@@ -39,21 +38,24 @@ namespace Interchange
             }
         }
 
-        public Node() {
+        public Node() : this(new NodeConfiguration()) {
+        }
+
+        public Node(NodeConfiguration configuration) {
             // TODO: Not actually random yet
             Random random = new Random();
 
-            buffer = new byte[BufferSize];
+            bufferPool = new ObjectPool<byte[]>(() => { return new byte[configuration.MTU]; }, configuration.BufferPoolSize);
 
-            readEventArgs = new SocketAsyncEventArgs();
-            readEventArgs.SetBuffer(buffer, 0, buffer.Length);
-            readEventArgs.Completed += IO_Completed;
-            readEventArgs.RemoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
+            socketEventArgsPool = new ObjectPool<SocketAsyncEventArgs>(() =>
+            {
+                var eventArgs = new SocketAsyncEventArgs();
+                eventArgs.Completed += IO_Completed;
 
-            writeEventArgs = new SocketAsyncEventArgs();
+                return eventArgs;
+            }, configuration.SocketEventPoolSize);
 
             connections = new ConcurrentDictionary<EndPoint, Connection>();
-            
 
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
 
@@ -72,7 +74,7 @@ namespace Interchange
             }
         }
 
-        public void Close() {
+        private void Close() {
             socket?.Dispose();
         }
 
@@ -80,14 +82,7 @@ namespace Interchange
             IPEndPoint ipEndPoint = new IPEndPoint(localIPAddress, port);
             socket.Bind(ipEndPoint);
 
-            socket.ReceiveFromAsync(readEventArgs);
-        }
-
-        internal async Task SendTo(EndPoint endPoint, byte[] buffer) {
-            writeEventArgs.RemoteEndPoint = endPoint;
-            writeEventArgs.SetBuffer(buffer, 0, buffer.Length);
-
-            await PerformSend(writeEventArgs);
+            await PerformReceive();
         }
 
         public async Task SendDataAsync(Connection connection, byte[] buffer) {
@@ -111,24 +106,37 @@ namespace Interchange
             await connectTcs.Task;
         }
 
-        private async Task PerformSend(SocketAsyncEventArgs e) {
+        internal async Task PerformSend(EndPoint endPoint, byte[] buffer) {
             try {
-                bool willRaiseEvent = socket.SendToAsync(e);
+                var eventArgs = socketEventArgsPool.GetObject();
+                eventArgs.RemoteEndPoint = endPoint;
+                eventArgs.SetBuffer(buffer, 0, buffer.Length);
+
+                bool willRaiseEvent = socket.SendToAsync(eventArgs);
                 if (!willRaiseEvent) {
-                    await HandlePacketSent(e);
+                    await HandlePacketSent(eventArgs);
+
+                    socketEventArgsPool.ReleaseObject(eventArgs);
                 }
-            } catch {
+            } catch (System.IO.IOException) {
                 // TODO: Properly handle these exceptions
             }
         }
 
-        private async Task PerformReceive(SocketAsyncEventArgs e) {
+        private async Task PerformReceive() {
             try {
-                bool willRaiseEvent = socket.ReceiveFromAsync(e);
+                var eventArgs = socketEventArgsPool.GetObject();
+                var readBuffer = bufferPool.GetObject();
+                eventArgs.SetBuffer(readBuffer, 0, readBuffer.Length);
+                eventArgs.RemoteEndPoint = LocalEndPoint;
+
+                bool willRaiseEvent = socket.ReceiveFromAsync(eventArgs);
                 if (!willRaiseEvent) {
-                    await HandlePacketReceived(e);
+                    await HandlePacketReceived(eventArgs);
+
+                    socketEventArgsPool.ReleaseObject(eventArgs);
                 }
-            } catch {
+            } catch (System.IO.IOException) {
                 // TODO: Properly handle these exceptions
             }
         }
@@ -144,6 +152,8 @@ namespace Interchange
                 default:
                     throw new NotImplementedException();
             }
+
+            socketEventArgsPool.ReleaseObject(e);
         }
 
         private async Task HandlePacketReceived(SocketAsyncEventArgs e) {
@@ -198,6 +208,8 @@ namespace Interchange
                                     if (ProcessIncomingMessageAction != null) {
                                         ProcessIncomingMessageAction(dataBuffer);
                                     }
+
+
                                 }
                                 break;
                             }
@@ -228,8 +240,13 @@ namespace Interchange
                 }
             }
 
+            // TODO: For now, release read buffer here. Later, release the read buffer from a dedicated packet object
+            bufferPool.ReleaseObject(e.Buffer);
+
             // Continue listening for new packets
-            await PerformReceive(e);
+            if (!disposed) {
+                await PerformReceive();
+            }
         }
 
         private async Task HandlePacketSent(SocketAsyncEventArgs e) {
@@ -239,7 +256,7 @@ namespace Interchange
         private async Task SendToSequenced(Connection connection, ushort sequenceNumber, byte[] buffer) {
             connection.PacketTransmissionController.RecordPacketTransmission(sequenceNumber, connection, buffer);
 
-            await SendTo(connection.RemoteEndPoint, buffer);
+            await PerformSend(connection.RemoteEndPoint, buffer);
         }
 
         private async Task SendInternalPacket(Connection connection, MessageType messageType) {
@@ -252,7 +269,7 @@ namespace Interchange
 
             connection.IncrementSequenceNumber();
 
-            await SendTo(connection.RemoteEndPoint, buffer);
+            await PerformSend(connection.RemoteEndPoint, buffer);
         }
 
         private async Task SendSynAckPacket(Connection connection) {
@@ -271,7 +288,7 @@ namespace Interchange
             connection.IncrementAckNumber();
 
             //await SendToSequenced(endPoint, sequenceNumber, buffer);
-            await SendTo(connection.RemoteEndPoint, buffer);
+            await PerformSend(connection.RemoteEndPoint, buffer);
         }
 
         private async Task SendAckPacket(Connection connection) {
@@ -284,7 +301,7 @@ namespace Interchange
 
             connection.IncrementAckNumber();
 
-            await SendTo(connection.RemoteEndPoint, buffer);
+            await PerformSend(connection.RemoteEndPoint, buffer);
         }
 
         private async Task SendReliableDataPacket(Connection connection, byte[] buffer) {
