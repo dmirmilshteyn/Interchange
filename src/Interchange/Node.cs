@@ -176,10 +176,13 @@ namespace Interchange
 
                                 ArraySegment<byte> dataBuffer = new ArraySegment<byte>(segment.Array, segment.Offset + 1 + 16 + 16, header.PayloadSize);
 
-                                await SendAckPacket(e.RemoteEndPoint);
+                                // TODO: Cache out-of-order packets, release them in order as new packets arrive
+                                if (header.SequenceNumber == AckNumber) {
+                                    await SendAckPacket(e.RemoteEndPoint);
 
-                                if (ProcessIncomingMessageAction != null) {
-                                    ProcessIncomingMessageAction(dataBuffer);
+                                    if (ProcessIncomingMessageAction != null) {
+                                        ProcessIncomingMessageAction(dataBuffer);
+                                    }
                                 }
                                 break;
                             }
