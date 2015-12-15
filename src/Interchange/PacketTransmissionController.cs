@@ -14,26 +14,23 @@ namespace Interchange
         int size;
         Node node;
 
-        public ushort Offset { get; private set; }
         public int SequenceNumber { get; private set; }
 
-        public PacketTransmissionController(Node node, ushort offset) {
+        public PacketTransmissionController(Node node) {
             this.size = 1024;
 
             this.node = node;
 
             packetTransmissions = new PacketTransmissionObject[size];
             packetTransmissionOrder = new Queue<int>();
-
-            this.Offset = offset;
         }
 
-        public void RecordPacketTransmission(ushort sequenceNumber, EndPoint endPoint, byte[] packet) {
-            int position = (ushort)(sequenceNumber - Offset);
+        public void RecordPacketTransmission(ushort sequenceNumber, Connection connection, byte[] packet) {
+            int position = (ushort)(sequenceNumber - connection.InitialSequenceNumber);
 
             packetTransmissions[position].Acked = false;
             packetTransmissions[position].Buffer = packet;
-            packetTransmissions[position].EndPoint = endPoint;
+            packetTransmissions[position].Connection = connection;
             packetTransmissions[position].SequenceNumber = sequenceNumber;
             packetTransmissions[position].LastTransmissionTime = DateTime.UtcNow.ToBinary();
 
@@ -42,8 +39,8 @@ namespace Interchange
             System.Diagnostics.Debug.WriteLine("Send packet #" + ((ushort)sequenceNumber).ToString());
         }
 
-        public void RecordAck(int ackNumber) {
-            ushort position = (ushort)(ackNumber - Offset);
+        public void RecordAck(Connection connection, int ackNumber) {
+            ushort position = (ushort)(ackNumber - connection.InitialSequenceNumber);
 
             packetTransmissions[position].Acked = true;
 
@@ -60,13 +57,9 @@ namespace Interchange
                 } else if (DateTime.UtcNow >= DateTime.FromBinary(transmissionObject.LastTransmissionTime).AddMilliseconds(1000)) {
                     packetTransmissionOrder.Dequeue();
 
-                    await node.SendTo(transmissionObject.EndPoint, transmissionObject.Buffer);
+                    await node.SendTo(transmissionObject.Connection.RemoteEndPoint, transmissionObject.Buffer);
                 }
             }
-        }
-
-        private ushort CalculatePosition(int sequenceNumber) {
-            return (ushort)(sequenceNumber - Offset);
         }
     }
 }

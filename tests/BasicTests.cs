@@ -8,16 +8,30 @@ namespace Interchange.Tests
 {
     public class BasicTests
     {
-        [Fact]
-        public async Task ConnectionTest() {
+        [Theory]
+        [InlineData(1)]
+        [InlineData(2)]
+        [InlineData(3)]
+        [InlineData(4)]
+        [InlineData(5)]
+        public async Task ConnectionTest(int clientCount) {
             using (var server = new TestNode()) {
-                using (var client = new TestNode()) {
-                    await server.ListenAsync();
+                await server.ListenAsync();
+
+                List<TestNode> clients = new List<TestNode>(clientCount);
+                for (int i = 0; i < clientCount; i++) {
+                    var client = new TestNode();
+
                     await client.Connect();
 
-                    var result = await server.ReadState();
+                    clients.Add(client);
 
+                    var result = await server.ReadState();
                     Assert.Equal(result, TestNodeState.Connected);
+                }
+
+                foreach (var client in clients) {
+                    client.Dispose();
                 }
             }
         }

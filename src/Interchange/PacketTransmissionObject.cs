@@ -10,7 +10,7 @@ namespace Interchange
     {
         public bool Acked;
         public ushort SequenceNumber;
-        public EndPoint EndPoint;
+        public Connection Connection;
         public byte[] Buffer;
         public long LastTransmissionTime;
     }

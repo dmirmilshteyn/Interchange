@@ -20,12 +20,22 @@ namespace Interchange.Playground
             clientNode.ProcessConnected = HandleClientConnected;
             await clientNode.Connect(serverEndPoint);
 
-            await clientNode.SendData(serverEndPoint, new byte[] { 40, 41, 42, 43, 44 });
-            await clientNode.SendData(serverEndPoint, new byte[] { 40, 41, 42, 43, 44, 45 });
+            Node clientNode2 = new Node();
+            clientNode2.ProcessConnected = HandleClient2Connected;
+            await clientNode2.Connect(serverEndPoint);
+
+            await clientNode.SendData(clientNode.RemoteConnection, new byte[] { 40, 41, 42, 43, 44 });
+            await clientNode.SendData(clientNode.RemoteConnection, new byte[] { 40, 41, 42, 43, 44, 45 });
+
+            await clientNode2.SendData(clientNode2.RemoteConnection, new byte[] { 15, 16, 17, 18 });
 
             while (true) {
                 await Task.Delay(1);
             }
+        }
+
+        private void HandleClient2Connected(EndPoint endPoint) {
+            Console.WriteLine("Client2 connected: " + ((IPEndPoint)endPoint).Address.ToString() + ", " + ((IPEndPoint)endPoint).Port.ToString());
         }
 
         private void HandleClientConnected(EndPoint endPoint) {

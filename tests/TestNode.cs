@@ -34,7 +34,7 @@ namespace Interchange.Tests
         }
 
         public async Task SendData(byte[] buffer) {
-            await base.SendData(ServerEndPoint, buffer);
+            await base.SendData(this.RemoteConnection, buffer);
         }
 
         private void HandleIncomingPacket(ArraySegment<byte> buffer) {
