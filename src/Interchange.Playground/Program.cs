@@ -21,6 +21,7 @@ namespace Interchange.Playground
             await clientNode.Connect(serverEndPoint);
 
             await clientNode.SendData(serverEndPoint, new byte[] { 40, 41, 42, 43, 44 });
+            await clientNode.SendData(serverEndPoint, new byte[] { 40, 41, 42, 43, 44, 45 });
 
             while (true) {
                 await Task.Delay(1);
@@ -36,7 +37,12 @@ namespace Interchange.Playground
         }
 
         private void HandleIncomingPacket(ArraySegment<byte> buffer) {
-            Console.WriteLine(buffer.Count);
+            for (int i = 0; i < buffer.Count; i++) {
+                Console.Write(buffer.Array[buffer.Offset + i]);
+                Console.Write(", ");
+            }
+
+            Console.WriteLine();
         }
     }
 }
