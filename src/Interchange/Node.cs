@@ -83,18 +83,18 @@ namespace Interchange
             socket.ReceiveFromAsync(readEventArgs);
         }
 
-        public async Task SendTo(EndPoint endPoint, byte[] buffer) {
+        internal async Task SendTo(EndPoint endPoint, byte[] buffer) {
             writeEventArgs.RemoteEndPoint = endPoint;
             writeEventArgs.SetBuffer(buffer, 0, buffer.Length);
 
             await PerformSend(writeEventArgs);
         }
 
-        public async Task SendData(Connection connection, byte[] buffer) {
+        public async Task SendDataAsync(Connection connection, byte[] buffer) {
             await SendReliableDataPacket(connection, buffer);
         }
 
-        public async Task Connect(EndPoint endPoint) {
+        public async Task ConnectAsync(EndPoint endPoint) {
             Connection connection = new Connection(this, endPoint);
             if (!connections.TryAdd(endPoint, connection)) {
                 // TODO: Couldn't add the connection

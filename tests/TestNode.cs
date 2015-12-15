@@ -29,12 +29,12 @@ namespace Interchange.Tests
             await base.ListenAsync(IPAddress.Loopback, 5000);
         }
 
-        public async Task Connect() {
-            await base.Connect(ServerEndPoint);
+        public async Task ConnectAsync() {
+            await base.ConnectAsync(ServerEndPoint);
         }
 
-        public async Task SendData(byte[] buffer) {
-            await base.SendData(this.RemoteConnection, buffer);
+        public async Task SendDataAsync(byte[] buffer) {
+            await base.SendDataAsync(this.RemoteConnection, buffer);
         }
 
         private void HandleIncomingPacket(ArraySegment<byte> buffer) {

@@ -22,7 +22,7 @@ namespace Interchange.Tests
                 for (int i = 0; i < clientCount; i++) {
                     var client = new TestNode();
 
-                    await client.Connect();
+                    await client.ConnectAsync();
 
                     clients.Add(client);
 
@@ -70,10 +70,10 @@ namespace Interchange.Tests
             using (var server = new TestNode()) {
                 using (var client = new TestNode()) {
                     await server.ListenAsync();
-                    await client.Connect();
+                    await client.ConnectAsync();
 
                     for (int i = 0; i < payloads.Length; i++) {
-                        await client.SendData(payloads[i]);
+                        await client.SendDataAsync(payloads[i]);
                         var result = await server.ReadMessage();
 
                         Assert.True(result.SequenceEqual(payloads[i]));

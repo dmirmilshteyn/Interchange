@@ -18,16 +18,16 @@ namespace Interchange.Playground
 
             Node clientNode = new Node();
             clientNode.ProcessConnected = HandleClientConnected;
-            await clientNode.Connect(serverEndPoint);
+            await clientNode.ConnectAsync(serverEndPoint);
 
             Node clientNode2 = new Node();
             clientNode2.ProcessConnected = HandleClient2Connected;
-            await clientNode2.Connect(serverEndPoint);
+            await clientNode2.ConnectAsync(serverEndPoint);
 
-            await clientNode.SendData(clientNode.RemoteConnection, new byte[] { 40, 41, 42, 43, 44 });
-            await clientNode.SendData(clientNode.RemoteConnection, new byte[] { 40, 41, 42, 43, 44, 45 });
+            await clientNode.SendDataAsync(clientNode.RemoteConnection, new byte[] { 40, 41, 42, 43, 44 });
+            await clientNode.SendDataAsync(clientNode.RemoteConnection, new byte[] { 40, 41, 42, 43, 44, 45 });
 
-            await clientNode2.SendData(clientNode2.RemoteConnection, new byte[] { 15, 16, 17, 18 });
+            await clientNode2.SendDataAsync(clientNode2.RemoteConnection, new byte[] { 15, 16, 17, 18 });
 
             while (true) {
                 await Task.Delay(1);
