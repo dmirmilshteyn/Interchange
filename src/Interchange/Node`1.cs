@@ -111,12 +111,12 @@ namespace Interchange
                 throw new NotImplementedException();
             }
 
-            await ListenAsync(IPAddress.Any, 0);
-            await SendInternalPacket(connection, MessageType.Syn);
-
             client = true;
 
             connectTcs = new TaskCompletionSource<bool>();
+
+            await ListenAsync(IPAddress.Any, 0);
+            await SendInternalPacket(connection, MessageType.Syn);
 
             await connectTcs.Task;
         }
@@ -204,7 +204,6 @@ namespace Interchange
                                     ProcessConnected(e.RemoteEndPoint);
                                 }
 
-                                // TODO: This becomes null in a few cases
                                 connectTcs.TrySetResult(true);
                             }
                             break;
