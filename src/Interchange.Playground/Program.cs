@@ -12,6 +12,11 @@ namespace Interchange.Playground
             Node node = new Node();
             node.ProcessIncomingMessageAction = HandleIncomingPacket;
             node.ProcessConnected = HandleConnected;
+
+            System.Diagnostics.Debug.WriteLine("Starting pool sizes:");
+            System.Diagnostics.Debug.WriteLine("Packet: " + node.PacketPool.Size);
+            System.Diagnostics.Debug.WriteLine("Socket Events: " + node.SocketEventArgsPool.Size);
+
             await node.ListenAsync(IPAddress.Any, 5000);
 
             IPEndPoint serverEndPoint = new IPEndPoint(IPAddress.Loopback, 5000);
@@ -30,6 +35,10 @@ namespace Interchange.Playground
             await clientNode2.SendDataAsync(clientNode2.RemoteConnection, new byte[] { 15, 16, 17, 18 });
 
             node.Dispose();
+
+            System.Diagnostics.Debug.WriteLine("Ending pool sizes:");
+            System.Diagnostics.Debug.WriteLine("Packet: " + node.PacketPool.Size);
+            System.Diagnostics.Debug.WriteLine("Socket Events: " + node.SocketEventArgsPool.Size);
 
             while (true) {
                 await Task.Delay(1);

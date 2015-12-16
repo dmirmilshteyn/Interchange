@@ -20,6 +20,14 @@ namespace Interchange
         ObjectPool<Packet> packetPool;
         ObjectPool<SocketAsyncEventArgs> socketEventArgsPool;
 
+        public IReadOnlyObjectPool<Packet> PacketPool {
+            get { return packetPool; }
+        }
+
+        public IReadOnlyObjectPool<SocketAsyncEventArgs> SocketEventArgsPool {
+            get { return socketEventArgsPool; }
+        }
+
         public Action<Packet> ProcessIncomingMessageAction { get; set; }
         public Action<EndPoint> ProcessConnected { get; set; }
 
@@ -125,9 +133,6 @@ namespace Interchange
                     await HandlePacketSent(eventArgs);
 
                     socketEventArgsPool.ReleaseObject(eventArgs);
-                    if (packet.CandidateForDispoal) {
-                        packet.Dispose();
-                    }
                 }
             } catch (ObjectDisposedException) {
                 // TODO: Properly dispose of this object
@@ -175,7 +180,7 @@ namespace Interchange
         private async Task HandlePacketReceived(SocketAsyncEventArgs e) {
             ArraySegment<byte> segment = new ArraySegment<byte>(e.Buffer, e.Offset, e.BytesTransferred);
 
-            bool handled = false; 
+            bool handled = false;
 
             if (segment.Count > 0) {
                 MessageType messageType = (MessageType)segment.Array[segment.Offset];
@@ -199,6 +204,7 @@ namespace Interchange
                                     ProcessConnected(e.RemoteEndPoint);
                                 }
 
+                                // TODO: This becomes null in a few cases
                                 connectTcs.TrySetResult(true);
                             }
                             break;

@@ -6,9 +6,13 @@ using System.Threading.Tasks;
 
 namespace Interchange
 {
-    public class ObjectPool<T>
+    public class ObjectPool<T> : IReadOnlyObjectPool<T>
     {
         ConcurrentBag<T> objects;
+
+        public int Size {
+            get { return objects.Count; }
+        }
 
         public ObjectPool() {
             objects = new ConcurrentBag<T>();
