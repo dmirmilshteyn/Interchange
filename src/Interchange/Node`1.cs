@@ -65,6 +65,12 @@ namespace Interchange
             Task.Run(Update, updateCancellationToken);
         }
 
+        public Task<Packet> RequestNewPacket() {
+            var packet = packetPool.GetObject();
+            packet.Initialize();
+            return Task.FromResult(packet);
+        }
+
         private async Task Update() {
             while (true) {
                 foreach (var connection in connections) {
@@ -107,11 +113,11 @@ namespace Interchange
             await connectTcs.Task;
         }
 
-        internal async Task PerformSend(EndPoint endPoint, byte[] buffer) {
+        internal async Task PerformSend(EndPoint endPoint, Packet packet) {
             try {
                 var eventArgs = socketEventArgsPool.GetObject();
                 eventArgs.RemoteEndPoint = endPoint;
-                eventArgs.SetBuffer(buffer, 0, buffer.Length);
+                eventArgs.SetBuffer(packet.BackingBuffer, packet.Payload.Offset, packet.Payload.Count);
 
                 bool willRaiseEvent = socket.SendToAsync(eventArgs);
                 if (!willRaiseEvent) {
@@ -129,7 +135,7 @@ namespace Interchange
         private async Task PerformReceive() {
             try {
                 var eventArgs = socketEventArgsPool.GetObject();
-                var packet = packetPool.GetObject();
+                var packet = await RequestNewPacket();
                 eventArgs.SetBuffer(packet.BackingBuffer, 0, packet.BackingBuffer.Length);
                 eventArgs.RemoteEndPoint = LocalEndPoint;
                 eventArgs.UserToken = packet;
@@ -197,6 +203,7 @@ namespace Interchange
                                     if (ProcessConnected != null) {
                                         ProcessConnected(e.RemoteEndPoint);
                                     }
+
                                 } else {
                                     connection.PacketTransmissionController.RecordAck(connection, header.SequenceNumber);
                                 }
@@ -257,71 +264,79 @@ namespace Interchange
 
         }
 
-        private async Task SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, byte[] buffer) {
-            connection.PacketTransmissionController.RecordPacketTransmission(sequenceNumber, connection, buffer);
+        private async Task SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, Packet packet) {
+            connection.PacketTransmissionController.RecordPacketTransmission(sequenceNumber, connection, packet);
 
-            await PerformSend(connection.RemoteEndPoint, buffer);
+            await PerformSend(connection.RemoteEndPoint, packet);
         }
 
         private async Task SendInternalPacket(Connection<TTag> connection, MessageType messageType) {
-            byte[] buffer = new byte[1 + 16];
-            buffer[0] = (byte)messageType;
+            var packet = await RequestNewPacket();
+            packet.MarkPayloadRegion(0, 1 + 16);
+
+            packet.BackingBuffer[0] = (byte)messageType;
 
             // TODO: Remove the unneeded byte[] allocation
             byte[] sqnBytes = BitConverter.GetBytes(connection.SequenceNumber);
-            Buffer.BlockCopy(sqnBytes, 0, buffer, 1, sqnBytes.Length);
+            Buffer.BlockCopy(sqnBytes, 0, packet.BackingBuffer, 1, sqnBytes.Length);
 
             connection.IncrementSequenceNumber();
 
-            await PerformSend(connection.RemoteEndPoint, buffer);
+            await PerformSend(connection.RemoteEndPoint, packet);
         }
 
         private async Task SendSynAckPacket(Connection<TTag> connection) {
-            byte[] buffer = new byte[1 + 16 + 16];
-            buffer[0] = (byte)MessageType.SynAck;
+            var packet = await RequestNewPacket();
+            packet.MarkPayloadRegion(0, 1 + 16 + 16);
+
+            packet.BackingBuffer[0] = (byte)MessageType.SynAck;
 
             // TODO: Remove the unneeded byte[] allocation
             byte[] sqnBytes = BitConverter.GetBytes(connection.SequenceNumber);
-            Buffer.BlockCopy(sqnBytes, 0, buffer, 1, sqnBytes.Length);
+            Buffer.BlockCopy(sqnBytes, 0, packet.BackingBuffer, 1, sqnBytes.Length);
 
             // TODO: Remove the unneeded byte[] allocation
             byte[] ackBytes = BitConverter.GetBytes(connection.AckNumber);
-            Buffer.BlockCopy(ackBytes, 0, buffer, 17, ackBytes.Length);
+            Buffer.BlockCopy(ackBytes, 0, packet.BackingBuffer, 17, ackBytes.Length);
 
             connection.IncrementSequenceNumber();
             connection.IncrementAckNumber();
 
             //await SendToSequenced(endPoint, sequenceNumber, buffer);
-            await PerformSend(connection.RemoteEndPoint, buffer);
+            await PerformSend(connection.RemoteEndPoint, packet);
         }
 
         private async Task SendAckPacket(Connection<TTag> connection) {
-            byte[] buffer = new byte[1 + 16];
-            buffer[0] = (byte)MessageType.Ack;
+            var packet = await RequestNewPacket();
+            packet.MarkPayloadRegion(0, 1 + 16);
+
+            packet.BackingBuffer[0] = (byte)MessageType.Ack;
 
             // TODO: Remove the unneeded byte[] allocation
             byte[] ackBytes = BitConverter.GetBytes(connection.AckNumber);
-            Buffer.BlockCopy(ackBytes, 0, buffer, 1, ackBytes.Length);
+            Buffer.BlockCopy(ackBytes, 0, packet.BackingBuffer, 1, ackBytes.Length);
 
             connection.IncrementAckNumber();
 
-            await PerformSend(connection.RemoteEndPoint, buffer);
+            await PerformSend(connection.RemoteEndPoint, packet);
         }
 
         private async Task SendReliableDataPacket(Connection<TTag> connection, byte[] buffer) {
-            byte[] packet = new byte[1 + 16 + 16 + buffer.Length];
-            packet[0] = (byte)MessageType.ReliableData;
+            var packet = await RequestNewPacket();
+            packet.MarkPayloadRegion(0, 1 + 16 + 16 + buffer.Length);
+
+            packet.BackingBuffer[0] = (byte)MessageType.ReliableData;
 
             ushort packetSequenceNumber = connection.SequenceNumber;
 
             // TODO: Remove the unneeded byte[] allocation
             byte[] sqnBytes = BitConverter.GetBytes(connection.SequenceNumber);
-            Buffer.BlockCopy(sqnBytes, 0, packet, 1, sqnBytes.Length);
+            Buffer.BlockCopy(sqnBytes, 0, packet.BackingBuffer, 1, sqnBytes.Length);
 
             byte[] sizeBytes = BitConverter.GetBytes((ushort)buffer.Length);
-            Buffer.BlockCopy(sizeBytes, 0, packet, 1 + 16, sizeBytes.Length);
+            Buffer.BlockCopy(sizeBytes, 0, packet.BackingBuffer, 1 + 16, sizeBytes.Length);
 
-            Buffer.BlockCopy(buffer, 0, packet, 1 + 16 + 16, buffer.Length);
+            Buffer.BlockCopy(buffer, 0, packet.BackingBuffer, 1 + 16 + 16, buffer.Length);
 
             connection.IncrementSequenceNumber();
 

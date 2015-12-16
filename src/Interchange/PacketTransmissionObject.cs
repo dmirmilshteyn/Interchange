@@ -11,7 +11,7 @@ namespace Interchange
         public bool Acked;
         public ushort SequenceNumber;
         public Connection<TTag> Connection;
-        public byte[] Buffer;
+        public Packet Packet;
         public long LastTransmissionTime;
     }
 }

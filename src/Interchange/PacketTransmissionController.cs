@@ -25,11 +25,11 @@ namespace Interchange
             packetTransmissionOrder = new Queue<int>();
         }
 
-        public void RecordPacketTransmission(ushort sequenceNumber, Connection<TTag> connection, byte[] packet) {
+        public void RecordPacketTransmission(ushort sequenceNumber, Connection<TTag> connection, Packet packet) {
             int position = (ushort)(sequenceNumber - connection.InitialSequenceNumber);
 
             packetTransmissions[position].Acked = false;
-            packetTransmissions[position].Buffer = packet;
+            packetTransmissions[position].Packet = packet;
             packetTransmissions[position].Connection = connection;
             packetTransmissions[position].SequenceNumber = sequenceNumber;
             packetTransmissions[position].LastTransmissionTime = DateTime.UtcNow.ToBinary();
@@ -44,6 +44,9 @@ namespace Interchange
 
             packetTransmissions[position].Acked = true;
 
+            // Only dispose the packet once it has been confirmed that the other side received it
+            packetTransmissions[position].Packet.Dispose();
+
             System.Diagnostics.Debug.WriteLine("Got ack for " + ackNumber.ToString());
         }
 
@@ -57,7 +60,7 @@ namespace Interchange
                 } else if (DateTime.UtcNow >= DateTime.FromBinary(transmissionObject.LastTransmissionTime).AddMilliseconds(1000)) {
                     packetTransmissionOrder.Dequeue();
 
-                    await node.PerformSend(transmissionObject.Connection.RemoteEndPoint, transmissionObject.Buffer);
+                    await node.PerformSend(transmissionObject.Connection.RemoteEndPoint, transmissionObject.Packet);
                 }
             }
         }

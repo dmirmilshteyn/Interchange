@@ -23,6 +23,11 @@ namespace Interchange
             this.BackingBuffer = backingBuffer;
         }
 
+        internal void Initialize() {
+            this.disposed = false;
+            this.Payload = default(ArraySegment<byte>);
+        }
+
         public void MarkPayloadRegion(int offset, int count) {
             this.Payload = new ArraySegment<byte>(this.BackingBuffer, offset, count);
         }
@@ -30,6 +35,8 @@ namespace Interchange
         public void Dispose() {
             if (!disposed) {
                 disposed = true;
+
+                // Release this packet back to the pool
                 packetPool.ReleaseObject(this);
             }
         }
