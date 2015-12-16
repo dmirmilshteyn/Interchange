@@ -85,8 +85,14 @@ namespace Interchange
                     await connection.Value.Update();
                 }
 
-                await Task.Delay(1);
+                await UserUpdate();
             }
+        }
+
+        protected virtual async Task UserUpdate() {
+            // Delay to prevent maxing CPU
+            // This behavious can be overwritten by not calling this base function
+            await Task.Delay(1);
         }
 
         private void Close() {
