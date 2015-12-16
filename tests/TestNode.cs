@@ -37,13 +37,13 @@ namespace Interchange.Tests
             await base.SendDataAsync(this.RemoteConnection, buffer);
         }
 
-        private void HandleIncomingPacket(Packet packet) {
+        private async Task HandleIncomingPacket(Connection<object> connection, Packet packet) {
             this.packetQueue.Enqueue(packet);
 
             bufferSemaphore.Release();
         }
 
-        private void HandleConnected(EndPoint endPoint) {
+        private async Task HandleConnected(Connection<object> connection, EndPoint endPoint) {
             nodeStateQueue.Enqueue(TestNodeState.Connected);
 
             nodeStateSemaphore.Release();
@@ -57,7 +57,7 @@ namespace Interchange.Tests
             }
 
             return null;
-        } 
+        }
 
         public async Task<TestNodeState> ReadState() {
             await nodeStateSemaphore.WaitAsync();

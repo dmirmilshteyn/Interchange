@@ -45,19 +45,19 @@ namespace Interchange.Playground
             }
         }
 
-        private void HandleClient2Connected(EndPoint endPoint) {
+        private async Task HandleClient2Connected(Connection<object> connection, EndPoint endPoint) {
             Console.WriteLine("Client2 connected: " + ((IPEndPoint)endPoint).Address.ToString() + ", " + ((IPEndPoint)endPoint).Port.ToString());
         }
 
-        private void HandleClientConnected(EndPoint endPoint) {
+        private async Task HandleClientConnected(Connection<object> connection, EndPoint endPoint) {
             Console.WriteLine("Client connected: " + ((IPEndPoint)endPoint).Address.ToString() + ", " + ((IPEndPoint)endPoint).Port.ToString());
         }
 
-        private void HandleConnected(EndPoint endPoint) {
+        private async Task HandleConnected(Connection<object> connection, EndPoint endPoint) {
             Console.WriteLine("Connected: " + ((IPEndPoint)endPoint).Address.ToString() + ", " + ((IPEndPoint)endPoint).Port.ToString());
         }
 
-        private void HandleIncomingPacket(Packet packet) {
+        private async Task HandleIncomingPacket(Connection<object> connection, Packet packet) {
             foreach (byte data in packet.Payload) {
                 Console.Write(data);
                 Console.Write(", ");

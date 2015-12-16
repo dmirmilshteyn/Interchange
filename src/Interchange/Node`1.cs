@@ -28,8 +28,8 @@ namespace Interchange
             get { return socketEventArgsPool; }
         }
 
-        public Action<Packet> ProcessIncomingMessageAction { get; set; }
-        public Action<EndPoint> ProcessConnected { get; set; }
+        public Func<Connection<TTag>, Packet, Task> ProcessIncomingMessageAction { get; set; }
+        public Func<Connection<TTag>, EndPoint, Task> ProcessConnected { get; set; }
 
         ConcurrentDictionary<EndPoint, Connection<TTag>> connections;
 
@@ -207,7 +207,7 @@ namespace Interchange
 
                                 connection.State = ConnectionState.Connected;
                                 if (ProcessConnected != null) {
-                                    ProcessConnected(e.RemoteEndPoint);
+                                    await ProcessConnected(connection, e.RemoteEndPoint);
                                 }
 
                                 connectTcs.TrySetResult(true);
@@ -218,7 +218,7 @@ namespace Interchange
 
                                 if (header.SequenceNumber == (ushort)(connection.AckNumber - 1)) {
                                     if (ProcessConnected != null) {
-                                        ProcessConnected(e.RemoteEndPoint);
+                                        await ProcessConnected(connection, e.RemoteEndPoint);
                                     }
                                 } else {
                                     // RecordAck will dispose the stored outgoing packet
@@ -240,7 +240,7 @@ namespace Interchange
                                     await SendAckPacket(connection);
 
                                     if (ProcessIncomingMessageAction != null) {
-                                        ProcessIncomingMessageAction(packet);
+                                        await ProcessIncomingMessageAction(connection, packet);
                                     } else {
                                         // If there is nothing using this packet, it can be disposed right away
                                         packet.Dispose();
