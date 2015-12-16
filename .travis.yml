@@ -14,4 +14,4 @@ script:
  - dnu restore
  - dnu pack --configuration Release
  - cd bin/Release
- - nuget push *.nupkg $API_KEY -s $FEED_URL
+ - nuget push *.nupkg $API_KEY -Source $FEED_URL
