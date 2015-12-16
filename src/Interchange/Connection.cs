@@ -34,6 +34,7 @@ namespace Interchange
             this.RemoteEndPoint = remoteEndPoint;
             this.node = node;
 
+            // TODO: Randomize this
             this.sequenceNumber = InitialSequenceNumber = 0;//random.Next(ushort.MaxValue, ushort.MaxValue + 1);
 
             PacketTransmissionController = new PacketTransmissionController<TTag>(node);
