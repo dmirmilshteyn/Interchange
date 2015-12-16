@@ -3,7 +3,7 @@ mono:
  - beta
 
 env:
- - DNX_BUILD_VERSION = $TRAVIS_BUILD_NUMBER
+ - DNX_BUILD_VERSION=$TRAVIS_BUILD_NUMBER
 
 install: 
  - curl -sSL https://raw.githubusercontent.com/aspnet/Home/dev/dnvminstall.sh | sh && source ~/.dnx/dnvm/dnvm.sh
@@ -17,4 +17,4 @@ script:
  - dnu restore
  - dnu pack --configuration Release
  - cd bin/Release
- - nuget push *.nupkg $API_KEY -Source $FEED_URL
+ - nuget push *.nupkg -ApiKey "$API_KEY" -Source "$FEED_URL"
