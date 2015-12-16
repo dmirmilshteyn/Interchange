@@ -10,3 +10,7 @@ script:
  - cd tests
  - dnu restore
  - dnx test
+ - cd ../src/Interchange
+ - dnu pack --configuration Release
+ - cd bin/Release
+ - nuget push *.nupkg $API_KEY -s $FEED_URL
