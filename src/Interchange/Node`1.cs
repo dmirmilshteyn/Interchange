@@ -52,6 +52,14 @@ namespace Interchange
             }
         }
 
+        public IEnumerable<Connection<TTag>> Connections {
+            get {
+                foreach (var connection in connections) {
+                    yield return connection.Value;
+                }
+            }
+        }
+
         public Node() : this(new NodeConfiguration()) {
         }
 
