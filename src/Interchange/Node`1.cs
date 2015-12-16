@@ -282,7 +282,7 @@ namespace Interchange
 
         private async Task HandlePacketSent(SocketAsyncEventArgs e) {
             Packet packet = (Packet)e.UserToken;
-            if (packet.CandidateForDispoal) {
+            if (packet.CandidateForDisposal) {
                 packet.Dispose();
             }
         }

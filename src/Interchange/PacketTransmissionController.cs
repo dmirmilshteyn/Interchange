@@ -26,7 +26,7 @@ namespace Interchange
         }
 
         public void RecordPacketTransmission(ushort sequenceNumber, Connection<TTag> connection, Packet packet) {
-            packet.CandidateForDispoal = false;
+            packet.CandidateForDisposal = false;
 
             int position = (ushort)(sequenceNumber - connection.InitialSequenceNumber);
 
