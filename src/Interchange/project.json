@@ -1,5 +1,5 @@
 {
-  "version": "1.0.6-beta",
+  "version": "1.0.0-*",
   "description": "Interchange Networking Library",
   "authors": [ "Daniel Mirmilshteyn" ],
   "tags": [ "" ],
