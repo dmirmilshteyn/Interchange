@@ -74,9 +74,11 @@ namespace Interchange.Tests
 
                     for (int i = 0; i < payloads.Length; i++) {
                         await client.SendDataAsync(payloads[i]);
-                        var result = await server.ReadMessage();
+                        using (var result = await server.ReadMessage()) {
 
-                        Assert.True(result.SequenceEqual(payloads[i]));
+                            Assert.True(result.Payload.SequenceEqual(payloads[i]));
+
+                        }
                     }
                 }
             }

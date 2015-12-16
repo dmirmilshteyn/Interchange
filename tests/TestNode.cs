@@ -9,7 +9,7 @@ namespace Interchange.Tests
 {
     public class TestNode : Node
     {
-        Queue<ArraySegment<byte>> bufferQueue;
+        Queue<Packet> packetQueue;
         Queue<TestNodeState> nodeStateQueue;
 
         private readonly IPEndPoint ServerEndPoint = new IPEndPoint(IPAddress.Loopback, 5000);
@@ -21,7 +21,7 @@ namespace Interchange.Tests
             this.ProcessIncomingMessageAction = HandleIncomingPacket;
             this.ProcessConnected = HandleConnected;
 
-            bufferQueue = new Queue<ArraySegment<byte>>();
+            packetQueue = new Queue<Packet>();
             nodeStateQueue = new Queue<TestNodeState>();
         }
 
@@ -37,8 +37,8 @@ namespace Interchange.Tests
             await base.SendDataAsync(this.RemoteConnection, buffer);
         }
 
-        private void HandleIncomingPacket(ArraySegment<byte> buffer) {
-            bufferQueue.Enqueue(buffer);
+        private void HandleIncomingPacket(Packet packet) {
+            this.packetQueue.Enqueue(packet);
 
             bufferSemaphore.Release();
         }
@@ -49,14 +49,14 @@ namespace Interchange.Tests
             nodeStateSemaphore.Release();
         }
 
-        public async Task<ArraySegment<byte>> ReadMessage() {
+        public async Task<Packet> ReadMessage() {
             await bufferSemaphore.WaitAsync();
 
-            if (bufferQueue.Count > 0) {
-                return bufferQueue.Dequeue();
+            if (packetQueue.Count > 0) {
+                return packetQueue.Dequeue();
             }
 
-            return default(ArraySegment<byte>);
+            return null;
         } 
 
         public async Task<TestNodeState> ReadState() {

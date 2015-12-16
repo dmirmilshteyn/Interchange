@@ -17,10 +17,10 @@ namespace Interchange
 
         Socket socket;
 
-        ObjectPool<byte[]> bufferPool;
+        ObjectPool<Packet> packetPool;
         ObjectPool<SocketAsyncEventArgs> socketEventArgsPool;
 
-        public Action<ArraySegment<byte>> ProcessIncomingMessageAction { get; set; }
+        public Action<Packet> ProcessIncomingMessageAction { get; set; }
         public Action<EndPoint> ProcessConnected { get; set; }
 
         ConcurrentDictionary<EndPoint, Connection<TTag>> connections;
@@ -45,7 +45,8 @@ namespace Interchange
             // TODO: Not actually random yet
             Random random = new Random();
 
-            bufferPool = new ObjectPool<byte[]>(() => { return new byte[configuration.MTU]; }, configuration.BufferPoolSize);
+            packetPool = new ObjectPool<Packet>();
+            packetPool.SeedPool(() => { return new Packet(packetPool, new byte[configuration.MTU]); }, configuration.BufferPoolSize);
 
             socketEventArgsPool = new ObjectPool<SocketAsyncEventArgs>(() =>
             {
@@ -126,9 +127,10 @@ namespace Interchange
         private async Task PerformReceive() {
             try {
                 var eventArgs = socketEventArgsPool.GetObject();
-                var readBuffer = bufferPool.GetObject();
-                eventArgs.SetBuffer(readBuffer, 0, readBuffer.Length);
+                var packet = packetPool.GetObject();
+                eventArgs.SetBuffer(packet.BackingBuffer, 0, packet.BackingBuffer.Length);
                 eventArgs.RemoteEndPoint = LocalEndPoint;
+                eventArgs.UserToken = packet;
 
                 bool willRaiseEvent = socket.ReceiveFromAsync(eventArgs);
                 if (!willRaiseEvent) {
@@ -199,14 +201,15 @@ namespace Interchange
                         case MessageType.ReliableData: {
                                 var header = ReliableDataHeader.FromSegment(segment);
 
-                                ArraySegment<byte> dataBuffer = new ArraySegment<byte>(segment.Array, segment.Offset + 1 + 16 + 16, header.PayloadSize);
+                                Packet packet = (Packet)e.UserToken;
+                                packet.MarkPayloadRegion(segment.Offset + 1 + 16 + 16, header.PayloadSize);
 
                                 // TODO: Cache out-of-order packets, release them in order as new packets arrive
                                 if (header.SequenceNumber == connection.AckNumber) {
                                     await SendAckPacket(connection);
 
                                     if (ProcessIncomingMessageAction != null) {
-                                        ProcessIncomingMessageAction(dataBuffer);
+                                        ProcessIncomingMessageAction(packet);
                                     }
 
 
@@ -239,9 +242,6 @@ namespace Interchange
                     }
                 }
             }
-
-            // TODO: For now, release read buffer here. Later, release the read buffer from a dedicated packet object
-            bufferPool.ReleaseObject(e.Buffer);
 
             // Continue listening for new packets
             if (!disposed) {

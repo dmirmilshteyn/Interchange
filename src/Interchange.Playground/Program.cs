@@ -48,13 +48,15 @@ namespace Interchange.Playground
             Console.WriteLine("Connected: " + ((IPEndPoint)endPoint).Address.ToString() + ", " + ((IPEndPoint)endPoint).Port.ToString());
         }
 
-        private void HandleIncomingPacket(ArraySegment<byte> buffer) {
-            for (int i = 0; i < buffer.Count; i++) {
-                Console.Write(buffer.Array[buffer.Offset + i]);
+        private void HandleIncomingPacket(Packet packet) {
+            foreach (byte data in packet.Payload) {
+                Console.Write(data);
                 Console.Write(", ");
             }
 
             Console.WriteLine();
+
+            packet.Dispose();
         }
     }
 }

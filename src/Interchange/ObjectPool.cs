@@ -10,8 +10,18 @@ namespace Interchange
     {
         ConcurrentBag<T> objects;
 
+        public ObjectPool() {
+            objects = new ConcurrentBag<T>();
+        }
+
         public ObjectPool(Func<T> generator, int initialCapacity) {
             objects = new ConcurrentBag<T>(BuildPoolSeed(generator, initialCapacity));
+        }
+
+        public void SeedPool(Func<T> generator, int initialCapacity) {
+            foreach (var item in BuildPoolSeed(generator, initialCapacity)) {
+                objects.Add(item);
+            }
         }
 
         private IEnumerable<T> BuildPoolSeed(Func<T> generator, int initialCapacity) {
