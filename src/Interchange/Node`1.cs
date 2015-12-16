@@ -44,7 +44,11 @@ namespace Interchange
 
         public Connection<TTag> RemoteConnection {
             get {
-                return connections.First().Value;
+                if (connections.Count > 0) {
+                    return connections.First().Value;
+                } else {
+                    return null;
+                }
             }
         }
 

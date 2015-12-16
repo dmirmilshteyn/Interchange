@@ -28,8 +28,11 @@ namespace Interchange
 
         public TTag Tag { get; set; }
 
+        Node<TTag> node;
+
         public Connection(Node<TTag> node, EndPoint remoteEndPoint) {
             this.RemoteEndPoint = remoteEndPoint;
+            this.node = node;
 
             this.sequenceNumber = InitialSequenceNumber = 0;//random.Next(ushort.MaxValue, ushort.MaxValue + 1);
 
@@ -50,6 +53,10 @@ namespace Interchange
 
         public async Task Update() {
             await PacketTransmissionController.ProcessRetransmissions();
+        }
+
+        public async Task SendDataAsync(byte[] buffer) {
+            await node.SendDataAsync(this, buffer);
         }
     }
 }
