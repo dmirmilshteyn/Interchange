@@ -118,12 +118,16 @@ namespace Interchange
                 var eventArgs = socketEventArgsPool.GetObject();
                 eventArgs.RemoteEndPoint = endPoint;
                 eventArgs.SetBuffer(packet.BackingBuffer, packet.Payload.Offset, packet.Payload.Count);
+                eventArgs.UserToken = packet;
 
                 bool willRaiseEvent = socket.SendToAsync(eventArgs);
                 if (!willRaiseEvent) {
                     await HandlePacketSent(eventArgs);
 
                     socketEventArgsPool.ReleaseObject(eventArgs);
+                    if (packet.CandidateForDispoal) {
+                        packet.Dispose();
+                    }
                 }
             } catch (ObjectDisposedException) {
                 // TODO: Properly dispose of this object
@@ -171,6 +175,8 @@ namespace Interchange
         private async Task HandlePacketReceived(SocketAsyncEventArgs e) {
             ArraySegment<byte> segment = new ArraySegment<byte>(e.Buffer, e.Offset, e.BytesTransferred);
 
+            bool handled = false; 
+
             if (segment.Count > 0) {
                 MessageType messageType = (MessageType)segment.Array[segment.Offset];
 
@@ -203,8 +209,9 @@ namespace Interchange
                                     if (ProcessConnected != null) {
                                         ProcessConnected(e.RemoteEndPoint);
                                     }
-
                                 } else {
+                                    // RecordAck will dispose the stored outgoing packet
+                                    // Leave this unhandled to allow for the incoming ack packet itself to be disposed
                                     connection.PacketTransmissionController.RecordAck(connection, header.SequenceNumber);
                                 }
                                 break;
@@ -217,13 +224,16 @@ namespace Interchange
 
                                 // TODO: Cache out-of-order packets, release them in order as new packets arrive
                                 if (header.SequenceNumber == connection.AckNumber) {
+                                    handled = true;
+
                                     await SendAckPacket(connection);
 
                                     if (ProcessIncomingMessageAction != null) {
                                         ProcessIncomingMessageAction(packet);
+                                    } else {
+                                        // If there is nothing using this packet, it can be disposed right away
+                                        packet.Dispose();
                                     }
-
-
                                 }
                                 break;
                             }
@@ -254,6 +264,11 @@ namespace Interchange
                 }
             }
 
+            if (!handled) {
+                Packet packet = (Packet)e.UserToken;
+                packet.Dispose();
+            }
+
             // Continue listening for new packets
             if (!disposed) {
                 await PerformReceive();
@@ -261,7 +276,10 @@ namespace Interchange
         }
 
         private async Task HandlePacketSent(SocketAsyncEventArgs e) {
-
+            Packet packet = (Packet)e.UserToken;
+            if (packet.CandidateForDispoal) {
+                packet.Dispose();
+            }
         }
 
         private async Task SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, Packet packet) {

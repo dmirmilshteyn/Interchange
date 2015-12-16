@@ -15,6 +15,8 @@ namespace Interchange
         public byte[] BackingBuffer { get; private set; }
         public ArraySegment<byte> Payload { get; private set; }
 
+        public bool CandidateForDispoal { get; set; } = true;
+
         private Packet() {
         }
 
@@ -25,6 +27,7 @@ namespace Interchange
 
         internal void Initialize() {
             this.disposed = false;
+            this.CandidateForDispoal = true;
             this.Payload = default(ArraySegment<byte>);
         }
 
