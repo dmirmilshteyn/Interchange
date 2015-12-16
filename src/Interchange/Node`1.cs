@@ -119,6 +119,8 @@ namespace Interchange
 
                     socketEventArgsPool.ReleaseObject(eventArgs);
                 }
+            } catch (ObjectDisposedException) {
+                // TODO: Properly dispose of this object
             } catch (System.IO.IOException) {
                 // TODO: Properly handle these exceptions
             }
@@ -138,6 +140,8 @@ namespace Interchange
 
                     socketEventArgsPool.ReleaseObject(eventArgs);
                 }
+            } catch (ObjectDisposedException) {
+                // TODO: Properly dispose of this object
             } catch (System.IO.IOException) {
                 // TODO: Properly handle these exceptions
             }
