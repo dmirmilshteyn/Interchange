@@ -31,6 +31,8 @@ namespace Interchange
         public Func<Connection<TTag>, Packet, Task> ProcessIncomingMessageAction { get; set; }
         public Func<Connection<TTag>, EndPoint, Task> ProcessConnected { get; set; }
 
+        public event EventHandler<ConnectionInitializedEventArgs<TTag>> ConnectionInitialized;
+
         ConcurrentDictionary<EndPoint, Connection<TTag>> connections;
 
         TaskCompletionSource<bool> connectTcs;
@@ -115,6 +117,10 @@ namespace Interchange
             if (!connections.TryAdd(endPoint, connection)) {
                 // TODO: Couldn't add the connection
                 throw new NotImplementedException();
+            }
+
+            if (ConnectionInitialized != null) {
+                ConnectionInitialized(this, new ConnectionInitializedEventArgs<TTag>(connection));
             }
 
             client = true;
@@ -260,6 +266,11 @@ namespace Interchange
                                     // TODO: All good, raise events
                                     connection.State = ConnectionState.HandshakeInitiated;
                                     connection.InitializeAckNumber(header.SequenceNumber);
+
+                                    if (ConnectionInitialized != null) {
+                                        ConnectionInitialized(this, new ConnectionInitializedEventArgs<TTag>(connection));
+                                    }
+
                                     await SendSynAckPacket(connection);
                                 } else {
                                     // Couldn't add to the connections dictionary - uh oh!
