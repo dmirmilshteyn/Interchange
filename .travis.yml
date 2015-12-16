@@ -7,9 +7,8 @@ install:
  - dnvm upgrade
 
 script:
- - typeset -Z4 build_num
  - build_num = $TRAVIS_BUILD_NUMBER
- - export DNX_BUILD_VERSION = build_num
+ - build_num=$(printf "%.4d" "$build_num")
  - cd tests
  - dnu restore
  - dnx test
