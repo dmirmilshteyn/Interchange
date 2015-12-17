@@ -17,7 +17,7 @@ namespace Interchange.Headers
 
         public static ReliableDataHeader FromSegment(ArraySegment<byte> segment) {
             ushort sequenceNumber = segment.ReadSequenceNumber(1);
-            ushort payloadSize = (ushort)BitConverter.ToInt16(segment.Array, segment.Offset + 1 + 16);
+            ushort payloadSize = (ushort)BitConverter.ToInt16(segment.Array, segment.Offset + 1 + 2);
 
             return new ReliableDataHeader(sequenceNumber, payloadSize);
         }

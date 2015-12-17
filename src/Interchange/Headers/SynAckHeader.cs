@@ -17,7 +17,7 @@ namespace Interchange.Headers
 
         public static SynAckHeader FromSegment(ArraySegment<byte> segment) {
             ushort sequenceNumber = segment.ReadSequenceNumber(1);
-            ushort ackNumber = segment.ReadSequenceNumber(17);
+            ushort ackNumber = segment.ReadSequenceNumber(3);
 
             return new SynAckHeader(sequenceNumber, ackNumber);
         }

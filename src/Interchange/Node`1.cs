@@ -258,7 +258,7 @@ namespace Interchange
                                 var header = ReliableDataHeader.FromSegment(segment);
 
                                 Packet packet = (Packet)e.UserToken;
-                                packet.MarkPayloadRegion(segment.Offset + 1 + 16 + 16, header.PayloadSize);
+                                packet.MarkPayloadRegion(segment.Offset + 1 + 2 + 2, header.PayloadSize);
 
                                 if (header.SequenceNumber == connection.AckNumber) {
                                     handled = true;
@@ -344,7 +344,7 @@ namespace Interchange
 
         private async Task SendInternalPacket(Connection<TTag> connection, MessageType messageType) {
             var packet = await RequestNewPacket();
-            packet.MarkPayloadRegion(0, 1 + 16);
+            packet.MarkPayloadRegion(0, 1 + 2);
 
             packet.BackingBuffer[0] = (byte)messageType;
 
@@ -357,12 +357,12 @@ namespace Interchange
 
         private async Task SendSynAckPacket(Connection<TTag> connection) {
             var packet = await RequestNewPacket();
-            packet.MarkPayloadRegion(0, 1 + 16 + 16);
+            packet.MarkPayloadRegion(0, 1 + 2 + 2);
 
             packet.BackingBuffer[0] = (byte)MessageType.SynAck;
 
             BitUtility.Write(connection.SequenceNumber, packet.BackingBuffer, 1);
-            BitUtility.Write(connection.AckNumber, packet.BackingBuffer, 17);
+            BitUtility.Write(connection.AckNumber, packet.BackingBuffer, 3);
 
             connection.IncrementSequenceNumber();
             connection.IncrementAckNumber();
@@ -379,7 +379,7 @@ namespace Interchange
 
         private async Task SendAckPacket(Connection<TTag> connection, ushort ackNumber) {
             var packet = await RequestNewPacket();
-            packet.MarkPayloadRegion(0, 1 + 16);
+            packet.MarkPayloadRegion(0, 1 + 2);
 
             packet.BackingBuffer[0] = (byte)MessageType.Ack;
 
@@ -390,15 +390,15 @@ namespace Interchange
 
         private async Task SendReliableDataPacket(Connection<TTag> connection, byte[] buffer) {
             var packet = await RequestNewPacket();
-            packet.MarkPayloadRegion(0, 1 + 16 + 16 + buffer.Length);
+            packet.MarkPayloadRegion(0, 1 + 2 + 2 + buffer.Length);
 
             packet.BackingBuffer[0] = (byte)MessageType.ReliableData;
 
             ushort packetSequenceNumber = connection.SequenceNumber;
 
             BitUtility.Write(connection.SequenceNumber, packet.BackingBuffer, 1);
-            BitUtility.Write((ushort)buffer.Length, packet.BackingBuffer, 1 + 16);
-            BitUtility.Write(buffer, packet.BackingBuffer, 1 + 16 + 16);
+            BitUtility.Write((ushort)buffer.Length, packet.BackingBuffer, 1 + 2);
+            BitUtility.Write(buffer, packet.BackingBuffer, 1 + 2 + 2);
 
             connection.IncrementSequenceNumber();
 
