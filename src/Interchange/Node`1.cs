@@ -28,11 +28,6 @@ namespace Interchange
             get { return socketEventArgsPool; }
         }
 
-        public Func<Connection<TTag>, Packet, Task> ProcessIncomingMessageAction { get; set; }
-        public Func<Connection<TTag>, EndPoint, Task> ProcessConnected { get; set; }
-
-        public event EventHandler<ConnectionInitializedEventArgs<TTag>> ConnectionInitialized;
-
         ConcurrentDictionary<EndPoint, Connection<TTag>> connections;
 
         TaskCompletionSource<bool> connectTcs;
@@ -109,6 +104,19 @@ namespace Interchange
             await Task.Delay(1);
         }
 
+        /// <summary>
+        /// Process an incoming message
+        /// </summary>
+        /// <param name="connection">The originating connection</param>
+        /// <param name="packet">The full data packet</param>
+        /// <returns>True if the packet has been handled; otherwise, returns false</returns>
+        protected virtual async Task<bool> ProcessIncomingMessageAction(Connection<TTag> connection, Packet packet) {
+            return false;
+        }
+
+        protected virtual async Task ProcessConnectionAccepted(Connection<TTag> connection) {
+        }
+
         private void Close() {
             socket?.Dispose();
         }
@@ -129,10 +137,6 @@ namespace Interchange
             if (!connections.TryAdd(endPoint, connection)) {
                 // TODO: Couldn't add the connection
                 throw new NotImplementedException();
-            }
-
-            if (ConnectionInitialized != null) {
-                ConnectionInitialized(this, new ConnectionInitializedEventArgs<TTag>(connection));
             }
 
             client = true;
@@ -224,9 +228,8 @@ namespace Interchange
                                 await SendAckPacket(connection);
 
                                 connection.State = ConnectionState.Connected;
-                                if (ProcessConnected != null) {
-                                    await ProcessConnected(connection, e.RemoteEndPoint);
-                                }
+
+                                await ProcessConnectionAccepted(connection);
 
                                 connectTcs.TrySetResult(true);
                             }
@@ -235,9 +238,7 @@ namespace Interchange
                                 var header = AckHeader.FromSegment(segment);
 
                                 if (header.SequenceNumber == (ushort)(connection.AckNumber - 1)) {
-                                    if (ProcessConnected != null) {
-                                        await ProcessConnected(connection, e.RemoteEndPoint);
-                                    }
+                                    await ProcessConnectionAccepted(connection);
                                 } else {
                                     // RecordAck will dispose the stored outgoing packet
                                     // Leave this unhandled to allow for the incoming ack packet itself to be disposed
@@ -257,10 +258,9 @@ namespace Interchange
 
                                     await SendAckPacket(connection);
 
-                                    if (ProcessIncomingMessageAction != null) {
-                                        await ProcessIncomingMessageAction(connection, packet);
-                                    } else {
-                                        // If there is nothing using this packet, it can be disposed right away
+                                    bool result = await ProcessIncomingMessageAction(connection, packet);
+                                    if (!result) {
+                                        // Dispose the packet if it has not been handled by user code
                                         packet.Dispose();
                                     }
                                 }
@@ -278,10 +278,6 @@ namespace Interchange
                                     // TODO: All good, raise events
                                     connection.State = ConnectionState.HandshakeInitiated;
                                     connection.InitializeAckNumber(header.SequenceNumber);
-
-                                    if (ConnectionInitialized != null) {
-                                        ConnectionInitialized(this, new ConnectionInitializedEventArgs<TTag>(connection));
-                                    }
 
                                     await SendSynAckPacket(connection);
                                 } else {

@@ -18,11 +18,22 @@ namespace Interchange.Tests
         SemaphoreSlim nodeStateSemaphore = new SemaphoreSlim(0);
 
         public TestNode() {
-            this.ProcessIncomingMessageAction = HandleIncomingPacket;
-            this.ProcessConnected = HandleConnected;
-
             packetQueue = new Queue<Packet>();
             nodeStateQueue = new Queue<TestNodeState>();
+        }
+
+        protected override async Task<bool> ProcessIncomingMessageAction(Connection<object> connection, Packet packet) {
+            this.packetQueue.Enqueue(packet);
+
+            bufferSemaphore.Release();
+
+            return true;
+        }
+
+        protected override async Task ProcessConnectionAccepted(Connection<object> connection) {
+            nodeStateQueue.Enqueue(TestNodeState.Connected);
+
+            nodeStateSemaphore.Release();
         }
 
         public async Task ListenAsync() {
@@ -35,18 +46,6 @@ namespace Interchange.Tests
 
         public async Task SendDataAsync(byte[] buffer) {
             await base.SendDataAsync(this.RemoteConnection, buffer);
-        }
-
-        private async Task HandleIncomingPacket(Connection<object> connection, Packet packet) {
-            this.packetQueue.Enqueue(packet);
-
-            bufferSemaphore.Release();
-        }
-
-        private async Task HandleConnected(Connection<object> connection, EndPoint endPoint) {
-            nodeStateQueue.Enqueue(TestNodeState.Connected);
-
-            nodeStateSemaphore.Release();
         }
 
         public async Task<Packet> ReadMessage() {
