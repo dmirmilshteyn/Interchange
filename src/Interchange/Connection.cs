@@ -30,6 +30,8 @@ namespace Interchange
 
         Node<TTag> node;
 
+        Dictionary<ushort, Packet> packetCache;
+
         public Connection(Node<TTag> node, EndPoint remoteEndPoint) {
             this.RemoteEndPoint = remoteEndPoint;
             this.node = node;
@@ -38,6 +40,27 @@ namespace Interchange
             this.sequenceNumber = InitialSequenceNumber = 0;//random.Next(ushort.MaxValue, ushort.MaxValue + 1);
 
             PacketTransmissionController = new PacketTransmissionController<TTag>(node);
+            packetCache = new Dictionary<ushort, Packet>();
+        }
+
+        internal void CachePacket(ushort sequenceNumber, Packet packet) {
+            if (!packetCache.ContainsKey(sequenceNumber)) {
+                packetCache.Add(sequenceNumber, packet);
+            }
+        }
+
+        internal IEnumerable<Packet> ReleaseCachedPackets(ushort currentSequenceNumber) {
+            // Check if the next packet is in the cache
+            currentSequenceNumber++;
+            while (packetCache.Count > 0) {
+                Packet packet = null;
+                if (packetCache.TryGetValue(currentSequenceNumber, out packet)) {
+                    yield return packet; 
+                    // Try the next packet
+                } else {
+                    break;
+                }
+            }
         }
 
         public void IncrementSequenceNumber() {
@@ -58,6 +81,17 @@ namespace Interchange
 
         public async Task SendDataAsync(byte[] buffer) {
             await node.SendDataAsync(this, buffer);
+        }
+    }
+
+    internal struct CachedPacket
+    {
+        public readonly ushort SequenceNumber;
+        public readonly Packet Packet;
+
+        public CachedPacket(ushort sequenceNumber, Packet packet) {
+            SequenceNumber = sequenceNumber;
+            Packet = packet;
         }
     }
 }

@@ -252,7 +252,6 @@ namespace Interchange
                                 Packet packet = (Packet)e.UserToken;
                                 packet.MarkPayloadRegion(segment.Offset + 1 + 16 + 16, header.PayloadSize);
 
-                                // TODO: Cache out-of-order packets, release them in order as new packets arrive
                                 if (header.SequenceNumber == connection.AckNumber) {
                                     handled = true;
 
@@ -263,6 +262,28 @@ namespace Interchange
                                         // Dispose the packet if it has not been handled by user code
                                         packet.Dispose();
                                     }
+
+                                    foreach (var futurePacket in connection.ReleaseCachedPackets(header.SequenceNumber)) {
+                                        // Handle the future packet, but do not send another ack - the ack has already been sent
+                                        // Instead, only increment the ack number to indicate it was processed
+                                        connection.IncrementAckNumber();
+                                        result = await ProcessIncomingMessageAction(connection, futurePacket);
+                                        if (!result) {
+                                            // Dispose the packet if it has not been handled by user code
+                                            packet.Dispose();
+                                        }
+                                    }
+                                } else if (header.SequenceNumber < connection.AckNumber) {
+                                    // This is an old, duplicate packet
+
+                                    // Send the ack, then do nothing else, it has already been handled - drop it
+                                    await SendAckPacket(connection, header.SequenceNumber);
+                                } else if (header.SequenceNumber > connection.AckNumber) {
+                                    // This is a future packet, cache it for now
+                                    connection.CachePacket(header.SequenceNumber, packet);
+
+                                    // Ack that this packet was received, but don't increment the ack number just yet
+                                    await SendAckPacket(connection, header.SequenceNumber);
                                 }
                                 break;
                             }
@@ -348,14 +369,18 @@ namespace Interchange
         }
 
         private async Task SendAckPacket(Connection<TTag> connection) {
+            await SendAckPacket(connection, connection.AckNumber);
+            connection.IncrementAckNumber();
+
+        }
+
+        private async Task SendAckPacket(Connection<TTag> connection, ushort ackNumber) {
             var packet = await RequestNewPacket();
             packet.MarkPayloadRegion(0, 1 + 16);
 
             packet.BackingBuffer[0] = (byte)MessageType.Ack;
 
-            BitUtility.Write(connection.AckNumber, packet.BackingBuffer, 1);
-
-            connection.IncrementAckNumber();
+            BitUtility.Write(ackNumber, packet.BackingBuffer, 1);
 
             await PerformSend(connection.RemoteEndPoint, packet);
         }

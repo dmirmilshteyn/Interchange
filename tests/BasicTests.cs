@@ -115,5 +115,7 @@ namespace Interchange.Tests
             }
         }
 
+        // TODO: Add tests for handling duplicate packets
+        // TODO: Add tests for handling out-of-order packets
     }
 }
