@@ -324,9 +324,7 @@ namespace Interchange
 
             packet.BackingBuffer[0] = (byte)messageType;
 
-            // TODO: Remove the unneeded byte[] allocation
-            byte[] sqnBytes = BitConverter.GetBytes(connection.SequenceNumber);
-            Buffer.BlockCopy(sqnBytes, 0, packet.BackingBuffer, 1, sqnBytes.Length);
+            BitUtility.Write(connection.SequenceNumber, packet.BackingBuffer, 1);
 
             connection.IncrementSequenceNumber();
 
@@ -339,13 +337,8 @@ namespace Interchange
 
             packet.BackingBuffer[0] = (byte)MessageType.SynAck;
 
-            // TODO: Remove the unneeded byte[] allocation
-            byte[] sqnBytes = BitConverter.GetBytes(connection.SequenceNumber);
-            Buffer.BlockCopy(sqnBytes, 0, packet.BackingBuffer, 1, sqnBytes.Length);
-
-            // TODO: Remove the unneeded byte[] allocation
-            byte[] ackBytes = BitConverter.GetBytes(connection.AckNumber);
-            Buffer.BlockCopy(ackBytes, 0, packet.BackingBuffer, 17, ackBytes.Length);
+            BitUtility.Write(connection.SequenceNumber, packet.BackingBuffer, 1);
+            BitUtility.Write(connection.AckNumber, packet.BackingBuffer, 17);
 
             connection.IncrementSequenceNumber();
             connection.IncrementAckNumber();
@@ -360,9 +353,7 @@ namespace Interchange
 
             packet.BackingBuffer[0] = (byte)MessageType.Ack;
 
-            // TODO: Remove the unneeded byte[] allocation
-            byte[] ackBytes = BitConverter.GetBytes(connection.AckNumber);
-            Buffer.BlockCopy(ackBytes, 0, packet.BackingBuffer, 1, ackBytes.Length);
+            BitUtility.Write(connection.AckNumber, packet.BackingBuffer, 1);
 
             connection.IncrementAckNumber();
 
@@ -377,14 +368,9 @@ namespace Interchange
 
             ushort packetSequenceNumber = connection.SequenceNumber;
 
-            // TODO: Remove the unneeded byte[] allocation
-            byte[] sqnBytes = BitConverter.GetBytes(connection.SequenceNumber);
-            Buffer.BlockCopy(sqnBytes, 0, packet.BackingBuffer, 1, sqnBytes.Length);
-
-            byte[] sizeBytes = BitConverter.GetBytes((ushort)buffer.Length);
-            Buffer.BlockCopy(sizeBytes, 0, packet.BackingBuffer, 1 + 16, sizeBytes.Length);
-
-            Buffer.BlockCopy(buffer, 0, packet.BackingBuffer, 1 + 16 + 16, buffer.Length);
+            BitUtility.Write(connection.SequenceNumber, packet.BackingBuffer, 1);
+            BitUtility.Write((ushort)buffer.Length, packet.BackingBuffer, 1 + 16);
+            BitUtility.Write(buffer, packet.BackingBuffer, 1 + 16 + 16);
 
             connection.IncrementSequenceNumber();
 
