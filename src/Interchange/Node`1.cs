@@ -91,7 +91,7 @@ namespace Interchange
         private async Task Update() {
             while (true) {
                 foreach (var connection in connections) {
-                    await connection.Value.Update();
+                    connection.Value.Update();
                 }
 
                 await UserUpdate();
@@ -125,7 +125,8 @@ namespace Interchange
             IPEndPoint ipEndPoint = new IPEndPoint(localIPAddress, port);
             socket.Bind(ipEndPoint);
 
-            await PerformReceive();
+            // Start listening, but do not wait for it to complete before returning
+            PerformReceive();
         }
 
         public async Task SendDataAsync(Connection<TTag> connection, byte[] buffer) {
@@ -149,8 +150,9 @@ namespace Interchange
             await connectTcs.Task;
         }
 
-        internal async Task PerformSend(EndPoint endPoint, Packet packet) {
+        internal async void PerformSend(EndPoint endPoint, Packet packet) {
             try {
+                // Needs to be an async-void to prevent blocking
                 var eventArgs = socketEventArgsPool.GetObject();
                 eventArgs.RemoteEndPoint = endPoint;
                 eventArgs.SetBuffer(packet.BackingBuffer, packet.Payload.Offset, packet.Payload.Count);
@@ -169,8 +171,9 @@ namespace Interchange
             }
         }
 
-        private async Task PerformReceive() {
+        private async void PerformReceive() {
             try {
+                // Needs to be an async-void because it goes through the IO_Completed loop, which doesn't support tasks
                 var eventArgs = socketEventArgsPool.GetObject();
                 var packet = await RequestNewPacket();
                 eventArgs.SetBuffer(packet.BackingBuffer, 0, packet.BackingBuffer.Length);
@@ -182,6 +185,9 @@ namespace Interchange
                     await HandlePacketReceived(eventArgs);
 
                     socketEventArgsPool.ReleaseObject(eventArgs);
+
+                    // Continue listening for new packets
+                    PerformReceive();
                 }
             } catch (ObjectDisposedException) {
                 // TODO: Properly dispose of this object
@@ -194,6 +200,8 @@ namespace Interchange
             switch (e.LastOperation) {
                 case SocketAsyncOperation.ReceiveFrom:
                     await HandlePacketReceived(e);
+
+                    PerformReceive();
                     break;
                 case SocketAsyncOperation.SendTo:
                     await HandlePacketSent(e);
@@ -319,11 +327,6 @@ namespace Interchange
                 Packet packet = (Packet)e.UserToken;
                 packet.Dispose();
             }
-
-            // Continue listening for new packets
-            if (!disposed) {
-                await PerformReceive();
-            }
         }
 
         private async Task HandlePacketSent(SocketAsyncEventArgs e) {
@@ -336,7 +339,7 @@ namespace Interchange
         private async Task SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, Packet packet) {
             connection.PacketTransmissionController.RecordPacketTransmission(sequenceNumber, connection, packet);
 
-            await PerformSend(connection.RemoteEndPoint, packet);
+            PerformSend(connection.RemoteEndPoint, packet);
         }
 
         private async Task SendInternalPacket(Connection<TTag> connection, MessageType messageType) {
@@ -349,7 +352,7 @@ namespace Interchange
 
             connection.IncrementSequenceNumber();
 
-            await PerformSend(connection.RemoteEndPoint, packet);
+            PerformSend(connection.RemoteEndPoint, packet);
         }
 
         private async Task SendSynAckPacket(Connection<TTag> connection) {
@@ -365,7 +368,7 @@ namespace Interchange
             connection.IncrementAckNumber();
 
             //await SendToSequenced(endPoint, sequenceNumber, buffer);
-            await PerformSend(connection.RemoteEndPoint, packet);
+            PerformSend(connection.RemoteEndPoint, packet);
         }
 
         private async Task SendAckPacket(Connection<TTag> connection) {
@@ -382,7 +385,7 @@ namespace Interchange
 
             BitUtility.Write(ackNumber, packet.BackingBuffer, 1);
 
-            await PerformSend(connection.RemoteEndPoint, packet);
+            PerformSend(connection.RemoteEndPoint, packet);
         }
 
         private async Task SendReliableDataPacket(Connection<TTag> connection, byte[] buffer) {

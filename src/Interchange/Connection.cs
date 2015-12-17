@@ -75,8 +75,8 @@ namespace Interchange
             this.ackNumber = ackNumber;
         }
 
-        public async Task Update() {
-            await PacketTransmissionController.ProcessRetransmissions();
+        public void Update() {
+            PacketTransmissionController.ProcessRetransmissions();
         }
 
         public async Task SendDataAsync(byte[] buffer) {

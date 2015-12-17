@@ -52,7 +52,7 @@ namespace Interchange
             System.Diagnostics.Debug.WriteLine("Got ack for " + ackNumber.ToString());
         }
 
-        public async Task ProcessRetransmissions() {
+        public void ProcessRetransmissions() {
             if (packetTransmissionOrder.Count > 0) {
                 int position = packetTransmissionOrder.Peek();
 
@@ -62,7 +62,7 @@ namespace Interchange
                 } else if (DateTime.UtcNow >= DateTime.FromBinary(transmissionObject.LastTransmissionTime).AddMilliseconds(1000)) {
                     packetTransmissionOrder.Dequeue();
 
-                    await node.PerformSend(transmissionObject.Connection.RemoteEndPoint, transmissionObject.Packet);
+                    node.PerformSend(transmissionObject.Connection.RemoteEndPoint, transmissionObject.Packet);
                 }
             }
         }
