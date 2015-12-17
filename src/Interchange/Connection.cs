@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Net;
 using System.Threading;
@@ -30,7 +31,7 @@ namespace Interchange
 
         Node<TTag> node;
 
-        Dictionary<ushort, Packet> packetCache;
+        ConcurrentDictionary<ushort, Packet> packetCache;
 
         public Connection(Node<TTag> node, EndPoint remoteEndPoint) {
             this.RemoteEndPoint = remoteEndPoint;
@@ -40,13 +41,11 @@ namespace Interchange
             this.sequenceNumber = InitialSequenceNumber = 0;//random.Next(ushort.MaxValue, ushort.MaxValue + 1);
 
             PacketTransmissionController = new PacketTransmissionController<TTag>(node);
-            packetCache = new Dictionary<ushort, Packet>();
+            packetCache = new ConcurrentDictionary<ushort, Packet>();
         }
 
         internal void CachePacket(ushort sequenceNumber, Packet packet) {
-            if (!packetCache.ContainsKey(sequenceNumber)) {
-                packetCache.Add(sequenceNumber, packet);
-            }
+            packetCache.TryAdd(sequenceNumber, packet);
         }
 
         internal IEnumerable<Packet> ReleaseCachedPackets(ushort currentSequenceNumber) {
@@ -54,8 +53,8 @@ namespace Interchange
             currentSequenceNumber++;
             while (packetCache.Count > 0) {
                 Packet packet = null;
-                if (packetCache.TryGetValue(currentSequenceNumber, out packet)) {
-                    yield return packet; 
+                if (packetCache.TryRemove(currentSequenceNumber, out packet)) {
+                    yield return packet;
                     // Try the next packet
                 } else {
                     break;
