@@ -7,6 +7,11 @@
   "licenseUrl": "https://github.com/dmirmilshteyn/Interchange/blob/master/LICENSE.md",
   "frameworks": {
     "dnx451": { },
+    "uap10.0": {
+      "dependencies": {
+        "Microsoft.NETCore.UniversalWindowsPlatform": "5.0.0"
+      }
+    },
     "dotnet": {
       "dependencies": {
         "Microsoft.CSharp": "4.0.1-beta-23409",
