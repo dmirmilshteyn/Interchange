@@ -7,22 +7,19 @@
   "licenseUrl": "https://github.com/dmirmilshteyn/Interchange/blob/master/LICENSE.md",
   "frameworks": {
     "dnx451": { },
+    "dnxcore50": {
+      "dependencies": {
+        "System.Runtime": "4.0.20",
+        "System.Threading.Tasks": "4.0.10",
+        "System.Linq": "4.0.0",
+        "System.Net.Primitives": "4.0.10",
+        "System.Net.Sockets": "4.0.0"
+      }
+    },
+    "net451": { },
     "uap10.0": {
       "dependencies": {
         "Microsoft.NETCore.UniversalWindowsPlatform": "5.0.0"
-      }
-    },
-    "dotnet": {
-      "dependencies": {
-        "Microsoft.CSharp": "4.0.1-beta-23409",
-        "System.Collections": "4.0.11-beta-23409",
-        "System.Linq": "4.0.1-beta-23409",
-        "System.Runtime": "4.0.21-beta-23409",
-        "System.Threading": "4.0.11-beta-23409",
-        "System.Net.Primitives": "4.0.11-beta-23409",
-        "System.Net.Sockets": "4.1.0-beta-23409",
-        "System.Collections.Concurrent": "4.0.11-beta-23409",
-        "System.IO": "4.0.11-beta-23409"
       }
     }
   }
