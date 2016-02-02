@@ -246,6 +246,8 @@ namespace Interchange
                                 var header = AckHeader.FromSegment(segment);
 
                                 if (header.SequenceNumber == (ushort)(connection.AckNumber - 1)) {
+                                    connection.State = ConnectionState.Connected;
+
                                     await ProcessConnectionAccepted(connection);
                                 } else {
                                     // RecordAck will dispose the stored outgoing packet
