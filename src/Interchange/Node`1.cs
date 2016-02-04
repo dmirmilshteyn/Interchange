@@ -110,23 +110,26 @@ namespace Interchange
         /// <param name="connection">The originating connection</param>
         /// <param name="packet">The full data packet</param>
         /// <returns>True if the packet has been handled; otherwise, returns false</returns>
-        protected virtual async Task<bool> ProcessIncomingMessageAction(Connection<TTag> connection, Packet packet) {
-            return false;
+        protected virtual Task<bool> ProcessIncomingMessageAction(Connection<TTag> connection, Packet packet) {
+            return Task.FromResult(false);
         }
 
-        protected virtual async Task ProcessConnectionAccepted(Connection<TTag> connection) {
+        protected virtual Task ProcessConnectionAccepted(Connection<TTag> connection) {
+            return TaskInterop.CompletedTask;
         }
 
         private void Close() {
             socket?.Dispose();
         }
 
-        public async Task ListenAsync(IPAddress localIPAddress, int port) {
+        public Task ListenAsync(IPAddress localIPAddress, int port) {
             IPEndPoint ipEndPoint = new IPEndPoint(localIPAddress, port);
             socket.Bind(ipEndPoint);
 
             // Start listening, but do not wait for it to complete before returning
             PerformReceive();
+
+            return TaskInterop.CompletedTask;
         }
 
         public async Task SendDataAsync(Connection<TTag> connection, byte[] buffer) {
@@ -331,17 +334,21 @@ namespace Interchange
             }
         }
 
-        private async Task HandlePacketSent(SocketAsyncEventArgs e) {
+        private Task HandlePacketSent(SocketAsyncEventArgs e) {
             Packet packet = (Packet)e.UserToken;
             if (packet.CandidateForDisposal) {
                 packet.Dispose();
             }
+
+            return TaskInterop.CompletedTask;
         }
 
-        private async Task SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, Packet packet) {
+        private Task SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, Packet packet) {
             connection.PacketTransmissionController.RecordPacketTransmission(sequenceNumber, connection, packet);
 
             PerformSend(connection.RemoteEndPoint, packet);
+
+            return TaskInterop.CompletedTask;
         }
 
         private async Task SendInternalPacket(Connection<TTag> connection, MessageType messageType) {

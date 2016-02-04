@@ -14,16 +14,20 @@ namespace Interchange.Playground
             }
         }
 
-        private async Task HandleClient2Connected(Connection<object> connection, EndPoint endPoint) {
+        private Task HandleClient2Connected(Connection<object> connection, EndPoint endPoint) {
+            return TaskInterop.CompletedTask;
         }
 
-        private async Task HandleClientConnected(Connection<object> connection, EndPoint endPoint) {
+        private Task HandleClientConnected(Connection<object> connection, EndPoint endPoint) {
+            return TaskInterop.CompletedTask;
         }
 
-        private async Task HandleConnected(Connection<object> connection, EndPoint endPoint) {
+        private Task HandleConnected(Connection<object> connection, EndPoint endPoint) {
+            return TaskInterop.CompletedTask;
         }
 
-        private async Task HandleIncomingPacket(Connection<object> connection, Packet packet) {
+        private Task HandleIncomingPacket(Connection<object> connection, Packet packet) {
+            return TaskInterop.CompletedTask;
         }
     }
 }
