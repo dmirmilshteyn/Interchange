@@ -14,7 +14,7 @@ namespace Interchange.Headers
         }
 
         public static SynHeader FromSegment(ArraySegment<byte> segment) {
-            ushort sequenceNumber = segment.ReadSequenceNumber(1);
+            ushort sequenceNumber = segment.ReadSequenceNumber(SystemHeader.Size);
             return new SynHeader(sequenceNumber);
         }
     }

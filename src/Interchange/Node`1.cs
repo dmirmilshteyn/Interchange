@@ -353,11 +353,14 @@ namespace Interchange
 
         private async Task SendInternalPacket(Connection<TTag> connection, MessageType messageType) {
             var packet = await RequestNewPacket();
-            packet.MarkPayloadRegion(0, 1 + 2);
 
-            packet.BackingBuffer[0] = (byte)messageType;
+            var systemHeader = new SystemHeader(messageType, 0, 0);
 
-            BitUtility.Write(connection.SequenceNumber, packet.BackingBuffer, 1);
+            packet.MarkPayloadRegion(0, SystemHeader.Size + 2);
+
+            systemHeader.WriteTo(packet);
+
+            BitUtility.Write(connection.SequenceNumber, packet.BackingBuffer, SystemHeader.Size);
 
             connection.IncrementSequenceNumber();
 
@@ -366,12 +369,13 @@ namespace Interchange
 
         private async Task SendSynAckPacket(Connection<TTag> connection) {
             var packet = await RequestNewPacket();
-            packet.MarkPayloadRegion(0, 1 + 2 + 2);
+            packet.MarkPayloadRegion(0, SystemHeader.Size + 2 + 2);
 
-            packet.BackingBuffer[0] = (byte)MessageType.SynAck;
+            var systemHeader = new SystemHeader(MessageType.SynAck, 0, 0);
+            systemHeader.WriteTo(packet);
 
-            BitUtility.Write(connection.SequenceNumber, packet.BackingBuffer, 1);
-            BitUtility.Write(connection.AckNumber, packet.BackingBuffer, 3);
+            BitUtility.Write(connection.SequenceNumber, packet.BackingBuffer, SystemHeader.Size);
+            BitUtility.Write(connection.AckNumber, packet.BackingBuffer, SystemHeader.Size + 2);
 
             connection.IncrementSequenceNumber();
             connection.IncrementAckNumber();
@@ -388,26 +392,28 @@ namespace Interchange
 
         private async Task SendAckPacket(Connection<TTag> connection, ushort ackNumber) {
             var packet = await RequestNewPacket();
-            packet.MarkPayloadRegion(0, 1 + 2);
+            packet.MarkPayloadRegion(0, SystemHeader.Size + 2);
 
-            packet.BackingBuffer[0] = (byte)MessageType.Ack;
+            var systemHeader = new SystemHeader(MessageType.Ack, 0, 0);
+            systemHeader.WriteTo(packet);
 
-            BitUtility.Write(ackNumber, packet.BackingBuffer, 1);
+            BitUtility.Write(ackNumber, packet.BackingBuffer, SystemHeader.Size);
 
             PerformSend(connection.RemoteEndPoint, packet);
         }
 
         private async Task SendReliableDataPacket(Connection<TTag> connection, byte[] buffer) {
             var packet = await RequestNewPacket();
-            packet.MarkPayloadRegion(0, 1 + 2 + 2 + buffer.Length);
+            packet.MarkPayloadRegion(0, SystemHeader.Size + 2 + 2 + buffer.Length);
 
-            packet.BackingBuffer[0] = (byte)MessageType.ReliableData;
+            var systemHeader = new SystemHeader(MessageType.ReliableData, 0, 0);
+            systemHeader.WriteTo(packet);
 
             ushort packetSequenceNumber = connection.SequenceNumber;
 
-            BitUtility.Write(connection.SequenceNumber, packet.BackingBuffer, 1);
-            BitUtility.Write((ushort)buffer.Length, packet.BackingBuffer, 1 + 2);
-            BitUtility.Write(buffer, packet.BackingBuffer, 1 + 2 + 2);
+            BitUtility.Write(connection.SequenceNumber, packet.BackingBuffer, SystemHeader.Size);
+            BitUtility.Write((ushort)buffer.Length, packet.BackingBuffer, SystemHeader.Size + 2);
+            BitUtility.Write(buffer, packet.BackingBuffer, SystemHeader.Size + 2 + 2);
 
             connection.IncrementSequenceNumber();
 

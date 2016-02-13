@@ -14,7 +14,7 @@ namespace Interchange.Headers
         }
 
         public static AckHeader FromSegment(ArraySegment<byte> segment) {
-            ushort sequenceNumber = segment.ReadSequenceNumber(1);
+            ushort sequenceNumber = segment.ReadSequenceNumber(SystemHeader.Size);
 
             return new AckHeader(sequenceNumber);
         }
