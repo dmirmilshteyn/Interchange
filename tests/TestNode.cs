@@ -31,6 +31,7 @@ namespace Interchange.Tests
         }
 
         protected override Task ProcessConnectionAccepted(Connection<object> connection) {
+            Console.WriteLine("Accepted.");
             nodeStateQueue.Enqueue(TestNodeState.Connected);
 
             nodeStateSemaphore.Release();
@@ -68,6 +69,10 @@ namespace Interchange.Tests
             }
 
             return TestNodeState.None;
+        }
+
+        public bool IsStatesQueueEmpty() {
+            return nodeStateQueue.Count == 0;
         }
     }
 }

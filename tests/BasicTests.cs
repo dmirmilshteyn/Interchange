@@ -28,6 +28,7 @@ namespace Interchange.Tests
 
                     var result = await server.ReadState();
                     Assert.Equal(result, TestNodeState.Connected);
+                    Assert.True(server.IsStatesQueueEmpty());
                 }
 
                 foreach (var client in clients) {
@@ -83,7 +84,6 @@ namespace Interchange.Tests
                 using (var result = await server.ReadMessage()) {
 
                     Assert.True(result.Payload.SequenceEqual(payloads[i]));
-
                 }
             }
         }

@@ -44,12 +44,16 @@ namespace Interchange
         public void RecordAck(Connection<TTag> connection, int ackNumber) {
             ushort position = (ushort)(ackNumber - connection.InitialSequenceNumber);
 
-            packetTransmissions[position].Acked = true;
+            if (!packetTransmissions[position].Acked) {
+                packetTransmissions[position].Acked = true;
 
-            // Only dispose the packet once it has been confirmed that the other side received it
-            packetTransmissions[position].Packet.Dispose();
+                // Only dispose the packet once it has been confirmed that the other side received it
+                packetTransmissions[position].Packet.Dispose();
 
-            System.Diagnostics.Debug.WriteLine("Got ack for " + ackNumber.ToString());
+                System.Diagnostics.Debug.WriteLine("Got ack for " + ackNumber.ToString());
+            } else {
+                System.Diagnostics.Debug.WriteLine($"Got DUPLICATE ack for {ackNumber}");
+            }
         }
 
         public void ProcessRetransmissions() {

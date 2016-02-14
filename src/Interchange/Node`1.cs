@@ -248,7 +248,7 @@ namespace Interchange
                         case MessageType.Ack: {
                                 var header = AckHeader.FromSegment(segment);
 
-                                if (header.SequenceNumber == (ushort)(connection.AckNumber - 1)) {
+                                if (header.SequenceNumber == (ushort)(connection.AckNumber - 1) && connection.State == ConnectionState.HandshakeInitiated) {
                                     connection.State = ConnectionState.Connected;
 
                                     await ProcessConnectionAccepted(connection);
