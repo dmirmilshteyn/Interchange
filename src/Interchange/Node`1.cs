@@ -268,39 +268,8 @@ namespace Interchange
                                 Packet packet = (Packet)e.UserToken;
                                 packet.MarkPayloadRegion(segment.Offset + SystemHeader.Size + 2 + 2, header.PayloadSize);
 
-                                if (header.SequenceNumber == connection.AckNumber) {
-                                    handled = true;
-
-                                    await SendAckPacket(connection);
-
-                                    bool result = await ProcessIncomingMessageAction(connection, packet);
-                                    if (!result) {
-                                        // Dispose the packet if it has not been handled by user code
-                                        packet.Dispose();
-                                    }
-
-                                    foreach (var futurePacket in connection.ReleaseCachedPackets(header.SequenceNumber)) {
-                                        // Handle the future packet, but do not send another ack - the ack has already been sent
-                                        // Instead, only increment the ack number to indicate it was processed
-                                        connection.IncrementAckNumber();
-                                        result = await ProcessIncomingMessageAction(connection, futurePacket);
-                                        if (!result) {
-                                            // Dispose the packet if it has not been handled by user code
-                                            packet.Dispose();
-                                        }
-                                    }
-                                } else if (header.SequenceNumber < connection.AckNumber) {
-                                    // This is an old, duplicate packet
-
-                                    // Send the ack, then do nothing else, it has already been handled - drop it
-                                    await SendAckPacket(connection, header.SequenceNumber);
-                                } else if (header.SequenceNumber > connection.AckNumber) {
-                                    // This is a future packet, cache it for now
-                                    connection.CachePacket(header.SequenceNumber, packet);
-
-                                    // Ack that this packet was received, but don't increment the ack number just yet
-                                    await SendAckPacket(connection, header.SequenceNumber);
-                                }
+                                handled = await ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, packet);
+                                
                                 break;
                             }
                     }
@@ -335,6 +304,46 @@ namespace Interchange
                 Packet packet = (Packet)e.UserToken;
                 packet.Dispose();
             }
+        }
+
+        private async Task<bool> ProcessIncomingReliableDataPacket(Connection<TTag> connection, ushort sequenceNumber, Packet packet) {
+            bool handled = false;
+
+            if (sequenceNumber == connection.AckNumber) {
+                handled = true;
+
+                await SendAckPacket(connection);
+
+                bool result = await ProcessIncomingMessageAction(connection, packet);
+                if (!result) {
+                    // Dispose the packet if it has not been handled by user code
+                    packet.Dispose();
+                }
+
+                foreach (var futurePacket in connection.ReleaseCachedPackets(sequenceNumber)) {
+                    // Handle the future packet, but do not send another ack - the ack has already been sent
+                    // Instead, only increment the ack number to indicate it was processed
+                    connection.IncrementAckNumber();
+                    result = await ProcessIncomingMessageAction(connection, futurePacket);
+                    if (!result) {
+                        // Dispose the packet if it has not been handled by user code
+                        packet.Dispose();
+                    }
+                }
+            } else if (sequenceNumber < connection.AckNumber) {
+                // This is an old, duplicate packet
+
+                // Send the ack, then do nothing else, it has already been handled - drop it
+                await SendAckPacket(connection, sequenceNumber);
+            } else if (sequenceNumber > connection.AckNumber) {
+                // This is a future packet, cache it for now
+                connection.CachePacket(sequenceNumber, packet);
+
+                // Ack that this packet was received, but don't increment the ack number just yet
+                await SendAckPacket(connection, sequenceNumber);
+            }
+
+            return handled;
         }
 
         private Task HandlePacketSent(SocketAsyncEventArgs e) {
