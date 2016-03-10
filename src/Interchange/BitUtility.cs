@@ -14,8 +14,12 @@ namespace Interchange
         }
 
         public static void Write(byte[] source, byte[] destination, int destinationOffset) {
+            Write(source, 0, destination, destinationOffset, source.Length);
+        }
+
+        public static void Write(byte[] source, int sourceOffset, byte[] destination, int destinationOffset, int length) {
             // TODO: Handle bit alignment cases
-            Buffer.BlockCopy(source, 0, destination, destinationOffset, source.Length);
+            Buffer.BlockCopy(source, sourceOffset, destination, destinationOffset, length);
         }
     }
 }
