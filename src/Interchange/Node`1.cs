@@ -266,7 +266,7 @@ namespace Interchange
                                 var header = ReliableDataHeader.FromSegment(segment);
 
                                 Packet packet = (Packet)e.UserToken;
-                                packet.MarkPayloadRegion(segment.Offset + 1 + 2 + 2, header.PayloadSize);
+                                packet.MarkPayloadRegion(segment.Offset + SystemHeader.Size + 2 + 2, header.PayloadSize);
 
                                 if (header.SequenceNumber == connection.AckNumber) {
                                     handled = true;
