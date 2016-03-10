@@ -222,11 +222,11 @@ namespace Interchange
             bool handled = false;
 
             if (segment.Count > 0) {
-                MessageType messageType = (MessageType)segment.Array[segment.Offset];
+                var systemHeader = SystemHeader.FromSegment(segment);
 
                 Connection<TTag> connection;
                 if (connections.TryGetValue(e.RemoteEndPoint, out connection)) {
-                    switch (messageType) {
+                    switch (systemHeader.MessageType) {
                         case MessageType.Syn:
                             // TODO: Reject the connection, already connected!
                             throw new NotImplementedException();
@@ -302,7 +302,7 @@ namespace Interchange
                             }
                     }
                 } else {
-                    switch (messageType) {
+                    switch (systemHeader.MessageType) {
                         case MessageType.Syn: {
                                 var header = SynHeader.FromSegment(segment);
 

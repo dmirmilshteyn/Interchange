@@ -40,5 +40,20 @@ namespace Interchange.Headers
         private byte PackPayload() {
             return FragmentNumber; // + channel number, packed into a single byte
         }
+
+        private static void UnpackPayload(byte payload, out byte fragmentNumber, out byte channelNumber) {
+            fragmentNumber = payload; // For now, since channel number is not yet packed
+            channelNumber = 0;
+        }
+
+        public static SystemHeader FromSegment(ArraySegment<byte> segment) {
+            MessageType messageType = (MessageType)segment.Array[segment.Offset];
+
+            byte fragmentNumber;
+            byte channelNumber;
+            UnpackPayload(segment.Array[segment.Offset + 1], out fragmentNumber, out channelNumber);
+
+            return new SystemHeader(messageType, fragmentNumber, channelNumber);
+        }
     }
 }
