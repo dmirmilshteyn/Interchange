@@ -29,6 +29,7 @@ namespace Interchange
         }
 
         ConcurrentDictionary<EndPoint, Connection<TTag>> connections;
+        NodeConfiguration configuration;
 
         TaskCompletionSource<bool> connectTcs;
 
@@ -59,6 +60,8 @@ namespace Interchange
         }
 
         public Node(NodeConfiguration configuration) {
+            this.configuration = configuration;
+
             // TODO: Not actually random yet
             Random random = new Random();
 
@@ -403,21 +406,54 @@ namespace Interchange
         }
 
         private async Task SendReliableDataPacket(Connection<TTag> connection, byte[] buffer) {
-            var packet = await RequestNewPacket();
-            packet.MarkPayloadRegion(0, SystemHeader.Size + 2 + 2 + buffer.Length);
+            int payloadFragmentSize = configuration.MTU - (SystemHeader.Size + 2 + 2);
 
-            var systemHeader = new SystemHeader(MessageType.ReliableData, 0, 0);
-            systemHeader.WriteTo(packet);
+            byte fragmentCount = (byte)Math.Ceiling(buffer.Length / (double)payloadFragmentSize);
 
             ushort packetSequenceNumber = connection.SequenceNumber;
-
-            BitUtility.Write(connection.SequenceNumber, packet.BackingBuffer, SystemHeader.Size);
-            BitUtility.Write((ushort)buffer.Length, packet.BackingBuffer, SystemHeader.Size + 2);
-            BitUtility.Write(buffer, packet.BackingBuffer, SystemHeader.Size + 2 + 2);
-
             connection.IncrementSequenceNumber();
 
-            await SendToSequenced(connection, packetSequenceNumber, packet);
+            int sentBytes = 0;
+            for (byte i = 0; i < fragmentCount; i++) {
+                int length = payloadFragmentSize;
+                if (sentBytes + payloadFragmentSize > buffer.Length) {
+                    // This is the remainder of the packet
+                    length = buffer.Length - sentBytes;
+                }
+
+                await SendReliableDataPacket(connection, buffer, sentBytes, length, packetSequenceNumber, i);
+
+                sentBytes += length;
+                //var packet = await RequestNewPacket();
+                //packet.MarkPayloadRegion(0, SystemHeader.Size + 2 + 2 + buffer.Length);
+
+                //var systemHeader = new SystemHeader(MessageType.ReliableData, 0, 0);
+                //systemHeader.WriteTo(packet);
+
+                //ushort packetSequenceNumber = connection.SequenceNumber;
+
+                //BitUtility.Write(connection.SequenceNumber, packet.BackingBuffer, SystemHeader.Size);
+                //BitUtility.Write((ushort)buffer.Length, packet.BackingBuffer, SystemHeader.Size + 2);
+                //BitUtility.Write(buffer, packet.BackingBuffer, SystemHeader.Size + 2 + 2);
+
+                //connection.IncrementSequenceNumber();
+
+                //await SendToSequenced(connection, packetSequenceNumber, packet);
+            }
+        }
+
+        private async Task SendReliableDataPacket(Connection<TTag> connection, byte[] buffer, int bufferOffset, int length, ushort sequenceNumber, byte fragmentNumber) {
+            var packet = await RequestNewPacket();
+            packet.MarkPayloadRegion(0, SystemHeader.Size + 2 + 2 + length);
+
+            var systemHeader = new SystemHeader(MessageType.ReliableData, fragmentNumber, 0);
+            systemHeader.WriteTo(packet);
+
+            BitUtility.Write(sequenceNumber, packet.BackingBuffer, SystemHeader.Size);
+            BitUtility.Write((ushort)length, packet.BackingBuffer, SystemHeader.Size + 2);
+            BitUtility.Write(buffer, bufferOffset, packet.BackingBuffer, SystemHeader.Size + 2 + 2, length);
+
+            await SendToSequenced(connection, sequenceNumber, packet);
         }
 
         public void Dispose() {
