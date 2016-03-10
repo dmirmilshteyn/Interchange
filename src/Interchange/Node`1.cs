@@ -424,21 +424,6 @@ namespace Interchange
                 await SendReliableDataPacket(connection, buffer, sentBytes, length, packetSequenceNumber, i, fragmentCount);
 
                 sentBytes += length;
-                //var packet = await RequestNewPacket();
-                //packet.MarkPayloadRegion(0, SystemHeader.Size + 2 + 2 + buffer.Length);
-
-                //var systemHeader = new SystemHeader(MessageType.ReliableData, 0, 0);
-                //systemHeader.WriteTo(packet);
-
-                //ushort packetSequenceNumber = connection.SequenceNumber;
-
-                //BitUtility.Write(connection.SequenceNumber, packet.BackingBuffer, SystemHeader.Size);
-                //BitUtility.Write((ushort)buffer.Length, packet.BackingBuffer, SystemHeader.Size + 2);
-                //BitUtility.Write(buffer, packet.BackingBuffer, SystemHeader.Size + 2 + 2);
-
-                //connection.IncrementSequenceNumber();
-
-                //await SendToSequenced(connection, packetSequenceNumber, packet);
             }
         }
 
