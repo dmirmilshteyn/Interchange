@@ -8,19 +8,23 @@ namespace Interchange.Headers
     public struct SystemHeader
     {
         public readonly byte FragmentNumber;
+        public readonly byte TotalFragmentCount;
         public readonly byte ChannelNumber;
         public readonly MessageType MessageType;
 
         public static int Size {
             get {
                 return
-                  1; // 4 bits for the fragment number, 4 bits for the channel number
+                  1 // 4 bits for the fragment number, 4 bits for the channel number
+                  + 1 // 4 bits for the total fragment count, 4 bits unused
+                  ;
             }
         }
 
-        public SystemHeader(MessageType messageType, byte fragmentNumber, byte channelNumber) {
+        public SystemHeader(MessageType messageType, byte fragmentNumber, byte totalFragmentCount, byte channelNumber) {
             this.MessageType = messageType;
             this.FragmentNumber = fragmentNumber;
+            this.TotalFragmentCount = totalFragmentCount;
             this.ChannelNumber = channelNumber;
         }
 
@@ -31,6 +35,7 @@ namespace Interchange.Headers
         public void WriteTo(byte[] buffer, int offset) {
             buffer[offset] = (byte)MessageType;
             buffer[offset + 1] = PackPayload();
+            buffer[offset + 2] = TotalFragmentCount;
         }
 
         public void WriteTo(byte[] buffer) {
@@ -52,8 +57,9 @@ namespace Interchange.Headers
             byte fragmentNumber;
             byte channelNumber;
             UnpackPayload(segment.Array[segment.Offset + 1], out fragmentNumber, out channelNumber);
+            byte totalFragmentCount = segment.Array[segment.Offset + 2];
 
-            return new SystemHeader(messageType, fragmentNumber, channelNumber);
+            return new SystemHeader(messageType, fragmentNumber, totalFragmentCount, channelNumber);
         }
     }
 }

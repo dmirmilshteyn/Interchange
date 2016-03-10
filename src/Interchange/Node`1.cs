@@ -357,7 +357,7 @@ namespace Interchange
         private async Task SendInternalPacket(Connection<TTag> connection, MessageType messageType) {
             var packet = await RequestNewPacket();
 
-            var systemHeader = new SystemHeader(messageType, 0, 0);
+            var systemHeader = new SystemHeader(messageType, 0, 0, 0);
 
             packet.MarkPayloadRegion(0, SystemHeader.Size + 2);
 
@@ -374,7 +374,7 @@ namespace Interchange
             var packet = await RequestNewPacket();
             packet.MarkPayloadRegion(0, SystemHeader.Size + 2 + 2);
 
-            var systemHeader = new SystemHeader(MessageType.SynAck, 0, 0);
+            var systemHeader = new SystemHeader(MessageType.SynAck, 0, 0, 0);
             systemHeader.WriteTo(packet);
 
             BitUtility.Write(connection.SequenceNumber, packet.BackingBuffer, SystemHeader.Size);
@@ -397,7 +397,7 @@ namespace Interchange
             var packet = await RequestNewPacket();
             packet.MarkPayloadRegion(0, SystemHeader.Size + 2);
 
-            var systemHeader = new SystemHeader(MessageType.Ack, 0, 0);
+            var systemHeader = new SystemHeader(MessageType.Ack, 0, 0, 0);
             systemHeader.WriteTo(packet);
 
             BitUtility.Write(ackNumber, packet.BackingBuffer, SystemHeader.Size);
@@ -421,7 +421,7 @@ namespace Interchange
                     length = buffer.Length - sentBytes;
                 }
 
-                await SendReliableDataPacket(connection, buffer, sentBytes, length, packetSequenceNumber, i);
+                await SendReliableDataPacket(connection, buffer, sentBytes, length, packetSequenceNumber, i, fragmentCount);
 
                 sentBytes += length;
                 //var packet = await RequestNewPacket();
@@ -442,11 +442,11 @@ namespace Interchange
             }
         }
 
-        private async Task SendReliableDataPacket(Connection<TTag> connection, byte[] buffer, int bufferOffset, int length, ushort sequenceNumber, byte fragmentNumber) {
+        private async Task SendReliableDataPacket(Connection<TTag> connection, byte[] buffer, int bufferOffset, int length, ushort sequenceNumber, byte fragmentNumber, byte totalFragmentCount) {
             var packet = await RequestNewPacket();
             packet.MarkPayloadRegion(0, SystemHeader.Size + 2 + 2 + length);
 
-            var systemHeader = new SystemHeader(MessageType.ReliableData, fragmentNumber, 0);
+            var systemHeader = new SystemHeader(MessageType.ReliableData, fragmentNumber, totalFragmentCount, 0);
             systemHeader.WriteTo(packet);
 
             BitUtility.Write(sequenceNumber, packet.BackingBuffer, SystemHeader.Size);
