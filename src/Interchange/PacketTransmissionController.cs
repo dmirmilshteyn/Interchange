@@ -37,8 +37,6 @@ namespace Interchange
             packetTransmissions[position].LastTransmissionTime = DateTime.UtcNow.ToBinary();
 
             packetTransmissionOrder.Enqueue(position);
-
-            System.Diagnostics.Debug.WriteLine("Send packet #" + ((ushort)sequenceNumber).ToString());
         }
 
         public void RecordAck(Connection<TTag> connection, int ackNumber) {
@@ -50,9 +48,9 @@ namespace Interchange
                 // Only dispose the packet once it has been confirmed that the other side received it
                 packetTransmissions[position].Packet.Dispose();
 
-                System.Diagnostics.Debug.WriteLine("Got ack for " + ackNumber.ToString());
+                // Got ack
             } else {
-                System.Diagnostics.Debug.WriteLine($"Got DUPLICATE ack for {ackNumber}");
+                // Got duplicate ack
             }
         }
 
