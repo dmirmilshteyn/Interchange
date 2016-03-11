@@ -40,7 +40,9 @@ namespace Interchange
                 disposed = true;
 
                 // Release this packet back to the pool
-                packetPool.ReleaseObject(this);
+                if (packetPool != null) {
+                    packetPool.ReleaseObject(this);
+                }
             }
         }
     }

@@ -15,7 +15,8 @@ namespace Interchange.Headers
         public static int Size {
             get {
                 return
-                  1 // 4 bits for the fragment number, 4 bits for the channel number
+                  1   // 1 byte for the message type
+                  + 1 // 4 bits for the fragment number, 4 bits for the channel number
                   + 1 // 4 bits for the total fragment count, 4 bits unused
                   ;
             }
@@ -36,6 +37,7 @@ namespace Interchange.Headers
             buffer[offset] = (byte)MessageType;
             buffer[offset + 1] = PackPayload();
             buffer[offset + 2] = TotalFragmentCount;
+            System.Diagnostics.Debug.WriteLine(TotalFragmentCount);
         }
 
         public void WriteTo(byte[] buffer) {
@@ -58,6 +60,8 @@ namespace Interchange.Headers
             byte channelNumber;
             UnpackPayload(segment.Array[segment.Offset + 1], out fragmentNumber, out channelNumber);
             byte totalFragmentCount = segment.Array[segment.Offset + 2];
+
+            System.Diagnostics.Debug.WriteLine("Got: " + totalFragmentCount);
 
             return new SystemHeader(messageType, fragmentNumber, totalFragmentCount, channelNumber);
         }

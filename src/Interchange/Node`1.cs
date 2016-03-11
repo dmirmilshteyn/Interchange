@@ -268,8 +268,28 @@ namespace Interchange
                                 Packet packet = (Packet)e.UserToken;
                                 packet.MarkPayloadRegion(segment.Offset + SystemHeader.Size + 2 + 2, header.PayloadSize);
 
-                                handled = await ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, packet);
-                                
+                                if (systemHeader.TotalFragmentCount > 1) {
+                                    var fragmentContainer = connection.RetreivePacketFragmentContainer(header.SequenceNumber, systemHeader.TotalFragmentCount);
+                                    bool packetComplete = fragmentContainer.StorePacketFragment(systemHeader.FragmentNumber, packet);
+
+                                    // Always handle this fragment to prevent the packet from being disposed prior to full assembly
+                                    handled = true;
+
+                                    if (packetComplete) {
+                                        connection.RemovePacketFragmentContainer(header.SequenceNumber);
+
+                                        var fullPacket = new Packet(null, new byte[fragmentContainer.PacketLength]);
+                                        int bytesCopied = fragmentContainer.CopyInto(fullPacket.BackingBuffer);
+                                        fullPacket.MarkPayloadRegion(0, bytesCopied);
+                                        if (await ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, fullPacket) == false) {
+                                            fullPacket.Dispose();
+                                        }
+                                    }
+                                } else {
+                                    // This is a full packet
+                                    handled = await ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, packet);
+                                }
+
                                 break;
                             }
                     }

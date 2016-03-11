@@ -32,6 +32,7 @@ namespace Interchange
         Node<TTag> node;
 
         ConcurrentDictionary<ushort, Packet> packetCache;
+        Dictionary<ushort, PacketFragmentContainer> fragmentCache;
 
         public Connection(Node<TTag> node, EndPoint remoteEndPoint) {
             this.RemoteEndPoint = remoteEndPoint;
@@ -42,6 +43,25 @@ namespace Interchange
 
             PacketTransmissionController = new PacketTransmissionController<TTag>(node);
             packetCache = new ConcurrentDictionary<ushort, Packet>();
+            fragmentCache = new Dictionary<ushort, PacketFragmentContainer>();
+        }
+
+        internal PacketFragmentContainer RetreivePacketFragmentContainer(ushort sequenceNumber, byte totalFragmentCount) {
+            PacketFragmentContainer fragmentContainer;
+            lock (fragmentCache) {
+                if (!fragmentCache.TryGetValue(sequenceNumber, out fragmentContainer)) {
+                    fragmentContainer = new PacketFragmentContainer(sequenceNumber, totalFragmentCount);
+                    fragmentCache.Add(sequenceNumber, fragmentContainer);
+                }
+            }
+
+            return fragmentContainer;
+        }
+
+        internal void RemovePacketFragmentContainer(ushort sequenceNumber) {
+            lock (fragmentCache) {
+                fragmentCache.Remove(sequenceNumber);
+            }
         }
 
         internal void CachePacket(ushort sequenceNumber, Packet packet) {
