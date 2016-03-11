@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Interchange
 {
-    public class PacketFragmentContainer
+    public class PacketFragmentContainer : IDisposable
     {
         Packet[] packetFragments;
 
@@ -52,6 +52,14 @@ namespace Interchange
             }
 
             return true;
+        }
+
+        public void Dispose() {
+            for (int i = 0;  i < packetFragments.Length; i++) {
+                if (packetFragments[i] != null) {
+                    packetFragments[i].Dispose();
+                }
+            }
         }
     }
 }

@@ -281,6 +281,9 @@ namespace Interchange
                                         var fullPacket = new Packet(null, new byte[fragmentContainer.PacketLength]);
                                         int bytesCopied = fragmentContainer.CopyInto(fullPacket.BackingBuffer);
                                         fullPacket.MarkPayloadRegion(0, bytesCopied);
+
+                                        fragmentContainer.Dispose();
+
                                         if (await ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, fullPacket) == false) {
                                             fullPacket.Dispose();
                                         }
