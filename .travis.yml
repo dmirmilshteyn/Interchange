@@ -6,7 +6,7 @@ dist: trusty
 mono:
  - beta
  
- before_install:
+before_install:
   - sudo apt-get -qq update
   - sudo apt-get install -y libunwind8-dev
 
