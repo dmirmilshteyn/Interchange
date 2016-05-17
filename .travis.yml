@@ -1,4 +1,8 @@
 language: csharp
+
+sudo: required
+dist: trusty
+
 mono:
  - beta
 
