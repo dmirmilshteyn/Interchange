@@ -8,7 +8,11 @@ namespace Interchange.Playground
 {
     public class Program
     {
-        public async Task Main(string[] args) {
+        public static void Main(string[] args) {
+            MainAsync(args).GetAwaiter().GetResult();
+        }
+
+        public static async Task MainAsync(string[] args) {
             while (true) {
                 await Task.Delay(1);
             }
