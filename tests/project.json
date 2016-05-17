@@ -1,5 +1,5 @@
 ﻿{
-  "version": "1.0.0-*",
+  "version": "1.0.0-beta-*",
   "description": "Interchange.Tests Class Library",
   "authors": [ "Daniel Mirmilshteyn" ],
 
@@ -9,7 +9,7 @@
   },
 
   "dependencies": {
-    "Interchange": "1.0.1-*",
+    "Interchange": "1.0.1-beta-*",
     "xunit": "2.1.0",
     "dotnet-test-xunit": "1.0.0-*"
   },
