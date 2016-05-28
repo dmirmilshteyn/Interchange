@@ -8,7 +8,7 @@
   },
 
   "dependencies": {
-    "Interchange": "1.0.1-beta-*",
+    "Interchange": { "target": "project" },
     "Microsoft.NETCore.App": {
       "type": "platform",
       "version": "1.0.0-rc2-3002702"

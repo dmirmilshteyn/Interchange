@@ -9,7 +9,7 @@
   },
 
   "dependencies": {
-    "Interchange": "1.0.1-beta-*",
+    "Interchange": { "target": "project" },
     "xunit": "2.1.0",
     "dotnet-test-xunit": "1.0.0-*"
   },

@@ -104,6 +104,24 @@ namespace Interchange.Tests
             }
         }
 
+        [Fact]
+        public async Task MultipleLargeMessageTests() {
+            using (var server = new TestNode()) {
+                using (var client = new TestNode()) {
+                    await server.ListenAsync();
+                    await client.ConnectAsync();
+
+                    for (int i = 0; i < 10; i++) {
+                        byte[] buffer = new byte[10000];
+                        Random rand = new Random();
+                        rand.NextBytes(buffer);
+
+                        await SendPayloads(server, client, new byte[][] { buffer });
+                    }
+                }
+            }
+        }
+
         [Theory]
         [MemberData(nameof(MessageTestPayloads))]
         public async Task PoolSizeTest(byte[][] payloads) {

@@ -9,6 +9,7 @@ namespace Interchange
     public class ObjectPool<T> : IReadOnlyObjectPool<T>
     {
         ConcurrentBag<T> objects;
+        Func<T> generator;
 
         public int Size {
             get { return objects.Count; }
@@ -19,10 +20,12 @@ namespace Interchange
         }
 
         public ObjectPool(Func<T> generator, int initialCapacity) {
+            this.generator = generator;
             objects = new ConcurrentBag<T>(BuildPoolSeed(generator, initialCapacity));
         }
 
         public void SeedPool(Func<T> generator, int initialCapacity) {
+            this.generator = generator;
             foreach (var item in BuildPoolSeed(generator, initialCapacity)) {
                 objects.Add(item);
             }
@@ -38,9 +41,12 @@ namespace Interchange
             T result;
             if (objects.TryTake(out result)) {
                 return result;
-            }
+            } else {
+                var generatedObject = generator();
+                objects.Add(generatedObject);
 
-            throw new NotImplementedException();
+                return generatedObject;
+            }
         }
 
         public void ReleaseObject(T releasedObject) {
