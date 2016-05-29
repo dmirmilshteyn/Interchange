@@ -158,8 +158,10 @@ namespace Interchange
             await connectTcs.Task;
         }
 
-        internal async Task PerformSend(EndPoint endPoint, Packet packet) {
+        internal async void PerformSend(EndPoint endPoint, Packet packet) {
             try {
+                // Async-void hack to prevent deadlocks (somewhere?)
+                // TODO: Fix this properly
                 var eventArgs = socketEventArgsPool.GetObject();
                 eventArgs.RemoteEndPoint = endPoint;
                 eventArgs.SetBuffer(packet.BackingBuffer, packet.Payload.Offset, packet.Payload.Count);
@@ -379,10 +381,14 @@ namespace Interchange
             return TaskInterop.CompletedTask;
         }
 
-        private async Task SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, Packet packet) {
+        private Task SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, Packet packet) {
             connection.PacketTransmissionController.RecordPacketTransmission(sequenceNumber, connection, packet);
 
-            await Task.Run(() => PerformSend(connection.RemoteEndPoint, packet));
+#pragma warning disable
+            PerformSend(connection.RemoteEndPoint, packet);
+#pragma warning restore
+
+            return TaskInterop.CompletedTask;
         }
 
         private async Task SendInternalPacket(Connection<TTag> connection, MessageType messageType) {
@@ -398,7 +404,9 @@ namespace Interchange
 
             connection.IncrementSequenceNumber();
 
-            await Task.Run(() => PerformSend(connection.RemoteEndPoint, packet));
+#pragma warning disable
+            PerformSend(connection.RemoteEndPoint, packet);
+#pragma warning restore
         }
 
         private async Task SendSynAckPacket(Connection<TTag> connection) {
@@ -415,13 +423,14 @@ namespace Interchange
             connection.IncrementAckNumber();
 
             //await SendToSequenced(endPoint, sequenceNumber, buffer);
-            await Task.Run(() => PerformSend(connection.RemoteEndPoint, packet));
+#pragma warning disable
+            PerformSend(connection.RemoteEndPoint, packet);
+#pragma warning restore
         }
 
         private async Task SendAckPacket(Connection<TTag> connection) {
             await SendAckPacket(connection, connection.AckNumber);
             connection.IncrementAckNumber();
-
         }
 
         private async Task SendAckPacket(Connection<TTag> connection, ushort ackNumber) {
@@ -433,7 +442,9 @@ namespace Interchange
 
             BitUtility.Write(ackNumber, packet.BackingBuffer, SystemHeader.Size);
 
-            await Task.Run(() => PerformSend(connection.RemoteEndPoint, packet));
+#pragma warning disable 
+            PerformSend(connection.RemoteEndPoint, packet);
+#pragma warning restore
         }
 
         private async Task SendReliableDataPacket(Connection<TTag> connection, byte[] buffer) {
