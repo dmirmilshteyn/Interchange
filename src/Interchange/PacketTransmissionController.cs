@@ -8,27 +8,28 @@ namespace Interchange
 {
     public class PacketTransmissionController<TTag>
     {
+        readonly int WindowSize;
+
         PacketTransmissionObject<TTag>[] packetTransmissions;
         Queue<int> packetTransmissionOrder;
 
-        int size;
         Node<TTag> node;
 
         public int SequenceNumber { get; private set; }
 
         public PacketTransmissionController(Node<TTag> node) {
-            this.size = 1024;
+            this.WindowSize = 1024;
 
             this.node = node;
 
-            packetTransmissions = new PacketTransmissionObject<TTag>[size];
+            packetTransmissions = new PacketTransmissionObject<TTag>[WindowSize];
             packetTransmissionOrder = new Queue<int>();
         }
 
         public void RecordPacketTransmission(ushort sequenceNumber, Connection<TTag> connection, Packet packet) {
             packet.CandidateForDisposal = false;
 
-            int position = (ushort)(sequenceNumber - connection.InitialSequenceNumber);
+            int position = CalculatePosition(sequenceNumber, connection);
 
             packetTransmissions[position].Acked = false;
             packetTransmissions[position].Packet = packet;
@@ -40,7 +41,7 @@ namespace Interchange
         }
 
         public void RecordAck(Connection<TTag> connection, int ackNumber) {
-            ushort position = (ushort)(ackNumber - connection.InitialSequenceNumber);
+            ushort position = CalculatePosition((ushort)ackNumber, connection);
 
             if (!packetTransmissions[position].Acked) {
                 packetTransmissions[position].Acked = true;
@@ -67,6 +68,10 @@ namespace Interchange
                     node.PerformSend(transmissionObject.Connection.RemoteEndPoint, transmissionObject.Packet);
                 }
             }
+        }
+
+        private ushort CalculatePosition(ushort number, Connection<TTag> connection) {
+            return (ushort)((number - connection.InitialSequenceNumber) % WindowSize);
         }
     }
 }

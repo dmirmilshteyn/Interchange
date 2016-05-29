@@ -78,6 +78,21 @@ namespace Interchange.Tests
             }
         }
 
+        [Theory]
+        [MemberData(nameof(MessageTestPayloads))]
+        public async Task ManySimpleMessageTest(byte[][] payloads) {
+            using (var server = new TestNode()) {
+                using (var client = new TestNode()) {
+                    await server.ListenAsync();
+                    await client.ConnectAsync();
+
+                    for (int i = 0; i < 1000; i++) {
+                        await SendPayloads(server, client, payloads);
+                    }
+                }
+            }
+        }
+
         private async Task SendPayloads(TestNode server, TestNode client, byte[][] payloads) {
             for (int i = 0; i < payloads.Length; i++) {
                 await client.SendDataAsync(payloads[i]);
