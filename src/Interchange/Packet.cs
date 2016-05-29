@@ -8,7 +8,6 @@ namespace Interchange
     public sealed class Packet : IDisposable
     {
         ObjectPool<Packet> packetPool;
-        int sequenceNumber;
 
         bool disposed;
 

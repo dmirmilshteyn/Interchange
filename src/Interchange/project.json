@@ -8,6 +8,10 @@
     "licenseUrl": "https://github.com/dmirmilshteyn/Interchange/blob/master/LICENSE.md"
   },
 
+  "buildOptions": {
+    "warningsAsErrors": true
+  },
+
   "dependencies": {
     "NETStandard.Library": "1.5.0-rc2-24027"
   },

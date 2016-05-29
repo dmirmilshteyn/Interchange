@@ -35,7 +35,8 @@ namespace Interchange
 
         CancellationToken updateCancellationToken;
 
-        bool client = false;
+        public bool IsClient { get; private set; }
+
         bool disposed;
 
         public Connection<TTag> RemoteConnection {
@@ -60,6 +61,7 @@ namespace Interchange
         }
 
         public Node(NodeConfiguration configuration) {
+            this.IsClient = false;
             this.configuration = configuration;
 
             // TODO: Not actually random yet
@@ -146,7 +148,7 @@ namespace Interchange
                 throw new NotImplementedException();
             }
 
-            client = true;
+            this.IsClient = true;
 
             connectTcs = new TaskCompletionSource<bool>();
 
@@ -156,9 +158,8 @@ namespace Interchange
             await connectTcs.Task;
         }
 
-        internal async void PerformSend(EndPoint endPoint, Packet packet) {
+        internal async Task PerformSend(EndPoint endPoint, Packet packet) {
             try {
-                // Needs to be an async-void to prevent blocking
                 var eventArgs = socketEventArgsPool.GetObject();
                 eventArgs.RemoteEndPoint = endPoint;
                 eventArgs.SetBuffer(packet.BackingBuffer, packet.Payload.Offset, packet.Payload.Count);
@@ -378,12 +379,10 @@ namespace Interchange
             return TaskInterop.CompletedTask;
         }
 
-        private Task SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, Packet packet) {
+        private async Task SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, Packet packet) {
             connection.PacketTransmissionController.RecordPacketTransmission(sequenceNumber, connection, packet);
 
-            PerformSend(connection.RemoteEndPoint, packet);
-
-            return TaskInterop.CompletedTask;
+            await Task.Run(() => PerformSend(connection.RemoteEndPoint, packet));
         }
 
         private async Task SendInternalPacket(Connection<TTag> connection, MessageType messageType) {
@@ -399,7 +398,7 @@ namespace Interchange
 
             connection.IncrementSequenceNumber();
 
-            PerformSend(connection.RemoteEndPoint, packet);
+            await Task.Run(() => PerformSend(connection.RemoteEndPoint, packet));
         }
 
         private async Task SendSynAckPacket(Connection<TTag> connection) {
@@ -416,7 +415,7 @@ namespace Interchange
             connection.IncrementAckNumber();
 
             //await SendToSequenced(endPoint, sequenceNumber, buffer);
-            PerformSend(connection.RemoteEndPoint, packet);
+            await Task.Run(() => PerformSend(connection.RemoteEndPoint, packet));
         }
 
         private async Task SendAckPacket(Connection<TTag> connection) {
@@ -434,7 +433,7 @@ namespace Interchange
 
             BitUtility.Write(ackNumber, packet.BackingBuffer, SystemHeader.Size);
 
-            PerformSend(connection.RemoteEndPoint, packet);
+            await Task.Run(() => PerformSend(connection.RemoteEndPoint, packet));
         }
 
         private async Task SendReliableDataPacket(Connection<TTag> connection, byte[] buffer) {
