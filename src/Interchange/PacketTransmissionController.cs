@@ -55,7 +55,7 @@ namespace Interchange
             }
         }
 
-        public void ProcessRetransmissions() {
+        public async Task ProcessRetransmissions() {
             if (packetTransmissionOrder.Count > 0) {
                 int position = packetTransmissionOrder.Peek();
 
@@ -65,7 +65,7 @@ namespace Interchange
                 } else if (DateTime.UtcNow >= DateTime.FromBinary(transmissionObject.LastTransmissionTime).AddMilliseconds(1000)) {
                     packetTransmissionOrder.Dequeue();
 
-                    node.PerformSend(transmissionObject.Connection.RemoteEndPoint, transmissionObject.Packet);
+                    await node.PerformSend(transmissionObject.Connection.RemoteEndPoint, transmissionObject.Packet);
                 }
             }
         }
