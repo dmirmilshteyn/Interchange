@@ -93,6 +93,26 @@ namespace Interchange.Tests
             }
         }
 
+        [Fact]
+        public async Task ManySimpleMessageTestWithoutWaitingOrdered() {
+            using (var server = new TestNode()) {
+                using (var client = new TestNode()) {
+                    await server.ListenAsync();
+                    await client.ConnectAsync();
+
+                    for (int n = 0; n < 1000; n++) {
+                        await client.SendDataAsync(BitConverter.GetBytes(n));
+                    }
+
+                    for (int n = 0; n < 1000; n++) {
+                        using (var result = await server.ReadMessage()) {
+                            Assert.True(result.Payload.SequenceEqual(BitConverter.GetBytes(n)));
+                        }
+                    }
+                }
+            }
+        }
+
         [Theory]
         [MemberData(nameof(MessageTestPayloads))]
         public async Task ManySimpleMessageTestWithoutWaiting(byte[][] payloads) {

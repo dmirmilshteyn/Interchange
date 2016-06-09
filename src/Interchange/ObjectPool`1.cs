@@ -42,10 +42,7 @@ namespace Interchange
             if (objects.TryTake(out result)) {
                 return result;
             } else {
-                var generatedObject = generator();
-                objects.Add(generatedObject);
-
-                return generatedObject;
+                return generator();
             }
         }
 
