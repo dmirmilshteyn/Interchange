@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Interchange.Headers
 {
-    public struct SynHeader : IPacketHeader
+    public struct SynHeader
     {
         public readonly ushort SequenceNumber;
 

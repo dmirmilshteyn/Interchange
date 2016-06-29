@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Interchange.Headers
 {
-    public struct ReliableDataHeader : IPacketHeader
+    public struct ReliableDataHeader
     {
         public readonly ushort SequenceNumber;
         public readonly ushort PayloadSize;
