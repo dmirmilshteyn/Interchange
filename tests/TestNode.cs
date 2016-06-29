@@ -57,7 +57,7 @@ namespace Interchange.Tests
                 return packetQueue.Dequeue();
             }
 
-            return null;
+            throw new InvalidOperationException("No more messages available.");
         }
 
         public async Task<TestNodeState> ReadState() {

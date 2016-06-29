@@ -100,11 +100,11 @@ namespace Interchange.Tests
                     await server.ListenAsync();
                     await client.ConnectAsync();
 
-                    for (int n = 0; n < 1000; n++) {
+                    for (int n = 0; n < 10000; n++) {
                         await client.SendDataAsync(BitConverter.GetBytes(n));
                     }
 
-                    for (int n = 0; n < 1000; n++) {
+                    for (int n = 0; n < 10000; n++) {
                         using (var result = await server.ReadMessage()) {
                             Assert.True(result.Payload.SequenceEqual(BitConverter.GetBytes(n)));
                         }
