@@ -31,7 +31,6 @@ namespace Interchange.Tests
         }
 
         protected override Task ProcessConnectionAccepted(Connection<object> connection) {
-            Console.WriteLine("Accepted.");
             nodeStateQueue.Enqueue(TestNodeState.Connected);
 
             nodeStateSemaphore.Release();
