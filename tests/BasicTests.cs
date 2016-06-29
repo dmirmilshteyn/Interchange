@@ -74,6 +74,8 @@ namespace Interchange.Tests
                     await client.ConnectAsync();
 
                     await SendPayloads(server, client, payloads);
+
+                    await client.DisconnectAsync();
                 }
             }
         }
@@ -89,6 +91,8 @@ namespace Interchange.Tests
                     for (int i = 0; i < 1000; i++) {
                         await SendPayloads(server, client, payloads);
                     }
+
+                    await client.DisconnectAsync();
                 }
             }
         }
@@ -135,6 +139,8 @@ namespace Interchange.Tests
                             }
                         }
                     }
+
+                    await client.DisconnectAsync();
                 }
             }
         }
@@ -161,6 +167,8 @@ namespace Interchange.Tests
                     rand.NextBytes(buffer);
 
                     await SendPayloads(server, client, new byte[][] { buffer });
+
+                    await client.DisconnectAsync();
                 }
             }
         }
@@ -179,6 +187,8 @@ namespace Interchange.Tests
 
                         await SendPayloads(server, client, new byte[][] { buffer });
                     }
+
+                    await client.DisconnectAsync();
                 }
             }
         }
@@ -206,6 +216,38 @@ namespace Interchange.Tests
                     Assert.Equal(startingClientPacketPoolSize - 1, client.PacketPool.Size);
                     Assert.Equal(startingServerSocketPoolSize - 1, server.SocketEventArgsPool.Size);
                     Assert.Equal(startingClientSocketPoolSize - 1, client.SocketEventArgsPool.Size);
+
+                    await client.DisconnectAsync();
+                }
+            }
+        }
+
+        [Fact]
+        public async Task ConnectDisconnectTest() {
+            using (var server = new TestNode()) {
+                using (var client = new TestNode()) {
+                    await server.ListenAsync();
+                    await client.ConnectAsync();
+
+                    // Ensure both the client and server are connected
+                    var result = await client.ReadState();
+                    Assert.Equal(result, TestNodeState.Connected);
+                    Assert.True(client.IsStatesQueueEmpty());
+
+                    result = await server.ReadState();
+                    Assert.Equal(result, TestNodeState.Connected);
+                    Assert.True(server.IsStatesQueueEmpty());
+
+                    await client.DisconnectAsync();
+
+                    // Ensure both the client and server and disconnected
+                    result = await client.ReadState();
+                    Assert.Equal(result, TestNodeState.Disconnected);
+                    Assert.True(client.IsStatesQueueEmpty());
+
+                    result = await server.ReadState();
+                    Assert.Equal(result, TestNodeState.Disconnected);
+                    Assert.True(server.IsStatesQueueEmpty());
                 }
             }
         }

@@ -123,6 +123,10 @@ namespace Interchange
             return TaskInterop.CompletedTask;
         }
 
+        protected virtual Task ProcessConnectionDisconnected(Connection<TTag> connection) {
+            return TaskInterop.CompletedTask;
+        }
+
         private void Close() {
             socket?.Dispose();
         }
@@ -156,6 +160,28 @@ namespace Interchange
             await SendInternalPacket(connection, MessageType.Syn);
 
             await connectTcs.Task;
+        }
+
+        public async Task DisconnectAsync(Connection<TTag> connection) {
+            if (connection.State != ConnectionState.Connected) {
+                throw new NotImplementedException("Invalid remote connection state");
+            }
+
+            connection.State = ConnectionState.Disconnecting;
+            connection.DisconnectTcs = new TaskCompletionSource<bool>();
+
+            await SendClosePacket(connection);
+            await connection.DisconnectTcs.Task;
+
+            // TODO: Timeout here to prevent deadlocks
+            Connection<TTag> temp;
+            while (!connections.TryRemove(connection.RemoteEndPoint, out temp)) { } 
+        }
+
+        public async Task DisconnectAsync() {
+            foreach (var connection in Connections) {
+                await DisconnectAsync(connection);
+            }
         }
 
         internal async Task PerformSend(EndPoint endPoint, Packet packet) {
@@ -258,11 +284,31 @@ namespace Interchange
                                     connection.State = ConnectionState.Connected;
 
                                     await ProcessConnectionAccepted(connection);
+                                } else if (connection.State == ConnectionState.Disconnecting && header.SequenceNumber == connection.DisconnectSequenceNumber) {
+                                    connection.State = ConnectionState.Disconnected;
+                                    await ProcessConnectionDisconnected(connection);
                                 } else {
                                     // RecordAck will dispose the stored outgoing packet
                                     // Leave this unhandled to allow for the incoming ack packet itself to be disposed
                                     connection.PacketTransmissionController.RecordAck(connection, header.SequenceNumber);
                                 }
+                                break;
+                            }
+                        case MessageType.Close: {
+                                var header = CloseHeader.FromSegment(segment);
+                                await SendAckPacket(connection, header.SequenceNumber);
+
+                                if (connection.State == ConnectionState.Connected) {
+                                    // This is the receiver - a close request packet is received from the initiator
+                                    connection.State = ConnectionState.Disconnecting;
+                                    connection.DisconnectSequenceNumber = await SendClosePacket(connection);
+                                } else if (connection.State == ConnectionState.Disconnecting) {
+                                    // This is the initiator - a close confirmation packet is received from the receiver
+                                    connection.State = ConnectionState.Disconnected;
+                                    connection.DisconnectTcs.TrySetResult(true);
+                                    await ProcessConnectionDisconnected(connection);
+                                }
+
                                 break;
                             }
                         case MessageType.ReliableData: {
@@ -471,6 +517,26 @@ namespace Interchange
             BitUtility.Write(buffer, bufferOffset, packet.BackingBuffer, SystemHeader.Size + 2 + 2, length);
 
             await SendToSequenced(connection, sequenceNumber, packet);
+        }
+
+        private async Task<ushort> SendClosePacket(Connection<TTag> connection) {
+            var packet = await RequestNewPacket();
+            packet.MarkPayloadRegion(0, SystemHeader.Size + 2);
+
+            var systemHeader = new SystemHeader(MessageType.Close, 0, 0, 0);
+            systemHeader.WriteTo(packet);
+
+            ushort sequenceNumber = connection.SequenceNumber;
+            connection.IncrementSequenceNumber();
+
+            BitUtility.Write(sequenceNumber, packet.BackingBuffer, SystemHeader.Size);
+
+            await SendToSequenced(connection, sequenceNumber, packet);
+
+            return sequenceNumber;
+        }
+
+        private void ProcessConnectionClose(Connection<TTag> connection) {
         }
 
         public void Dispose() {

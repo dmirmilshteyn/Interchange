@@ -38,6 +38,14 @@ namespace Interchange.Tests
             return TaskInterop.CompletedTask;
         }
 
+        protected override Task ProcessConnectionDisconnected(Connection<object> connection) {
+            nodeStateQueue.Enqueue(TestNodeState.Disconnected);
+
+            nodeStateSemaphore.Release();
+
+            return TaskInterop.CompletedTask;
+        }
+
         public async Task ListenAsync() {
             await base.ListenAsync(IPAddress.Loopback, 5000);
         }

@@ -9,6 +9,8 @@ namespace Interchange
     {
         None,
         HandshakeInitiated,
-        Connected
+        Connected,
+        Disconnecting,
+        Disconnected
     }
 }

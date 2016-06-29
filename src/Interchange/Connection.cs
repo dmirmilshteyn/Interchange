@@ -10,6 +10,9 @@ namespace Interchange
 {
     public class Connection<TTag>
     {
+        internal TaskCompletionSource<bool> DisconnectTcs { get; set; }
+        internal ushort DisconnectSequenceNumber { get; set; }
+
         public ConnectionState State { get; internal set; }
         public EndPoint RemoteEndPoint { get; private set; }
 
