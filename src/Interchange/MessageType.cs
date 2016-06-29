@@ -10,6 +10,7 @@ namespace Interchange
         Ack = 1,
         Syn = 2,
         SynAck = 3,
+        Close = 4,
 
         ReliableData = 128
     }
