@@ -87,10 +87,10 @@ namespace Interchange
             Task.Run(Update, updateCancellationToken);
         }
 
-        public Task<Packet> RequestNewPacket() {
+        public Packet RequestNewPacket() {
             var packet = packetPool.GetObject();
             packet.Initialize();
-            return Task.FromResult(packet);
+            return packet;
         }
 
         private async Task Update() {
@@ -210,7 +210,7 @@ namespace Interchange
             try {
                 // Needs to be an async-void because it goes through the IO_Completed loop, which doesn't support tasks
                 var eventArgs = socketEventArgsPool.GetObject();
-                var packet = await RequestNewPacket();
+                var packet = RequestNewPacket();
                 eventArgs.SetBuffer(packet.BackingBuffer, 0, packet.BackingBuffer.Length);
                 eventArgs.RemoteEndPoint = LocalEndPoint;
                 eventArgs.UserToken = packet;
@@ -434,7 +434,7 @@ namespace Interchange
         }
 
         private async Task SendInternalPacket(Connection<TTag> connection, MessageType messageType) {
-            var packet = await RequestNewPacket();
+            var packet = RequestNewPacket();
 
             var systemHeader = new SystemHeader(messageType, 0, 0, 0);
 
@@ -450,7 +450,7 @@ namespace Interchange
         }
 
         private async Task SendSynAckPacket(Connection<TTag> connection) {
-            var packet = await RequestNewPacket();
+            var packet = RequestNewPacket();
             packet.MarkPayloadRegion(0, SystemHeader.Size + 2 + 2);
 
             var systemHeader = new SystemHeader(MessageType.SynAck, 0, 0, 0);
@@ -472,7 +472,7 @@ namespace Interchange
         }
 
         private async Task SendAckPacket(Connection<TTag> connection, ushort ackNumber) {
-            var packet = await RequestNewPacket();
+            var packet = RequestNewPacket();
             packet.MarkPayloadRegion(0, SystemHeader.Size + 2);
 
             var systemHeader = new SystemHeader(MessageType.Ack, 0, 0, 0);
@@ -506,7 +506,7 @@ namespace Interchange
         }
 
         private async Task SendReliableDataPacket(Connection<TTag> connection, byte[] buffer, int bufferOffset, int length, ushort sequenceNumber, byte fragmentNumber, byte totalFragmentCount) {
-            var packet = await RequestNewPacket();
+            var packet = RequestNewPacket();
             packet.MarkPayloadRegion(0, SystemHeader.Size + 2 + 2 + length);
 
             var systemHeader = new SystemHeader(MessageType.ReliableData, fragmentNumber, totalFragmentCount, 0);
@@ -520,7 +520,7 @@ namespace Interchange
         }
 
         private async Task<ushort> SendClosePacket(Connection<TTag> connection) {
-            var packet = await RequestNewPacket();
+            var packet = RequestNewPacket();
             packet.MarkPayloadRegion(0, SystemHeader.Size + 2);
 
             var systemHeader = new SystemHeader(MessageType.Close, 0, 0, 0);
