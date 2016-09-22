@@ -232,7 +232,7 @@ namespace Interchange
                     if (TestSettings != null) {
                         bool dropPacket = false;
                         if (TestSettings.PacketDropPercentage > 0) {
-                            if (TestSettings.Random.Next(100) <= TestSettings.PacketDropPercentage) {
+                            if (TestSettings.GetNextPacketDropValue() <= TestSettings.PacketDropPercentage) {
                                 dropPacket = true;
                             }
                         }

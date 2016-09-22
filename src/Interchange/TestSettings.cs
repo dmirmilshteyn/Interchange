@@ -9,16 +9,34 @@ namespace Interchange
 {
     public class TestSettings
     {
-        public Random Random { get; }
+        int packetDropValueCount = 0;
 
         public int SimulatedLatency { get; set; }
         public int PacketDropPercentage { get; set; }
 
         public TestSettings(int simulatedLatency, int packetDropPercentage) {
-            this.Random = new Random();
-
             this.SimulatedLatency = simulatedLatency;
             this.PacketDropPercentage = packetDropPercentage;
+        }
+
+        public int GetNextPacketDropValue() {
+            packetDropValueCount++;
+            switch (packetDropValueCount % 6) {
+                case 0:
+                    return 0;
+                case 1:
+                    return 20;
+                case 2:
+                    return 40;
+                case 3:
+                    return 60;
+                case 4:
+                    return 80;
+                case 5:
+                    return 100;
+            }
+
+            return 0;
         }
     }
 }
