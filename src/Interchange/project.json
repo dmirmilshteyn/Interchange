@@ -12,6 +12,14 @@
     "warningsAsErrors": true
   },
 
+  "configurations": {
+    "Test": {
+      "buildOptions": {
+        "define": [ "TEST" ]
+      }
+    }
+  },
+
   "frameworks": {
     "netstandard1.3": {
       "dependencies": {

@@ -12,7 +12,7 @@ script:
  - export DOTNET_BUILD_VERSION=$build_num
  - dotnet restore
  - cd tests
- - dotnet test
+ - dotnet test -c Test
  - cd ../src/Interchange
  - dotnet pack --configuration Release
  - cd bin/Release

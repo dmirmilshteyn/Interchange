@@ -22,6 +22,11 @@ namespace Interchange.Tests
             nodeStateQueue = new Queue<TestNodeState>();
         }
 
+        public TestNode(TestSettings testSettings) : base(testSettings) {
+            packetQueue = new Queue<Packet>();
+            nodeStateQueue = new Queue<TestNodeState>();
+        }
+
         protected override bool ProcessIncomingMessageAction(Connection<object> connection, Packet packet) {
             this.packetQueue.Enqueue(packet);
 

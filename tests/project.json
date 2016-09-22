@@ -9,9 +9,16 @@
   },
 
   "dependencies": {
-    "Interchange": { "target": "project" },
+    "Interchange": {
+      "target": "project",
+      "type": "build"
+    },
     "xunit": "2.1.0",
     "dotnet-test-xunit": "1.0.0-*"
+  },
+
+  "configurations": {
+    "Test": {}
   },
 
   "frameworks": {

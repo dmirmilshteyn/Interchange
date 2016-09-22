@@ -13,6 +13,10 @@ namespace Interchange
 {
     public class Node<TTag> : IDisposable
     {
+#if TEST
+        public TestSettings TestSettings { get; }
+#endif
+
         private readonly EndPoint LocalEndPoint = new IPEndPoint(IPAddress.Any, 0);
 
         Socket socket;
@@ -56,6 +60,12 @@ namespace Interchange
                 }
             }
         }
+
+#if TEST
+        public Node(TestSettings testSettings) : this() {
+            this.TestSettings = testSettings;
+        }
+#endif
 
         public Node() : this(new NodeConfiguration()) {
         }

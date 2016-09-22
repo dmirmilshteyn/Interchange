@@ -1,12 +1,10 @@
-﻿{
+{
   "version": "1.0.0-beta-*",
   "description": "Interchange.Playground Console Application",
   "authors": [ "Daniel" ],
-
   "buildOptions": {
     "emitEntryPoint": true
   },
-
   "dependencies": {
     "Interchange": { "target": "project" },
     "Microsoft.NETCore.App": {
@@ -14,9 +12,11 @@
       "version": "1.0.0"
     }
   },
-
   "frameworks": {
     "netcoreapp1.0": {
     }
+  },
+  "configurations": {
+    "Test": { }
   }
 }
