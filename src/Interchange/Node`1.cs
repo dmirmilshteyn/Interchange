@@ -228,7 +228,28 @@ namespace Interchange
         private void IO_Completed(object sender, SocketAsyncEventArgs e) {
             switch (e.LastOperation) {
                 case SocketAsyncOperation.ReceiveFrom:
+#if TEST
+                    if (TestSettings != null) {
+                        if (TestSettings.SimulatedLatency > 0) {
+                            Task.Run(async () =>
+                            {
+                                await Task.Delay(TestSettings.SimulatedLatency);
+                                HandlePacketReceived(e);
+
+                                PerformReceive();
+                                socketEventArgsPool.ReleaseObject(e);
+                            });
+
+                            return;
+                        } else {
+                            HandlePacketReceived(e);
+                        }
+                    } else {
+                        HandlePacketReceived(e);
+                    }
+#else
                     HandlePacketReceived(e);
+#endif
 
                     PerformReceive();
                     break;
@@ -299,7 +320,9 @@ namespace Interchange
                                 } else if (connection.State == ConnectionState.Disconnecting) {
                                     // This is the initiator - a close confirmation packet is received from the receiver
                                     connection.State = ConnectionState.Disconnected;
-                                    connection.DisconnectTcs.TrySetResult(true);
+                                    if (connection.DisconnectTcs != null) {
+                                        connection.DisconnectTcs.TrySetResult(true);
+                                    }
                                     ProcessConnectionDisconnected(connection);
                                 }
 
