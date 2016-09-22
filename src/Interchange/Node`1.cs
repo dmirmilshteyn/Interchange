@@ -230,19 +230,28 @@ namespace Interchange
                 case SocketAsyncOperation.ReceiveFrom:
 #if TEST
                     if (TestSettings != null) {
-                        if (TestSettings.SimulatedLatency > 0) {
-                            Task.Run(async () =>
-                            {
-                                await Task.Delay(TestSettings.SimulatedLatency);
+                        bool dropPacket = false;
+                        if (TestSettings.PacketDropPercentage > 0) {
+                            if (TestSettings.Random.Next(100) <= TestSettings.PacketDropPercentage) {
+                                dropPacket = true;
+                            }
+                        }
+
+                        if (!dropPacket) {
+                            if (TestSettings.SimulatedLatency > 0) {
+                                Task.Run(async () =>
+                                {
+                                    await Task.Delay(TestSettings.SimulatedLatency);
+                                    HandlePacketReceived(e);
+
+                                    PerformReceive();
+                                    socketEventArgsPool.ReleaseObject(e);
+                                });
+
+                                return;
+                            } else {
                                 HandlePacketReceived(e);
-
-                                PerformReceive();
-                                socketEventArgsPool.ReleaseObject(e);
-                            });
-
-                            return;
-                        } else {
-                            HandlePacketReceived(e);
+                            }
                         }
                     } else {
                         HandlePacketReceived(e);
