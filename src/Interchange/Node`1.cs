@@ -233,7 +233,8 @@ namespace Interchange
                         bool dropPacket = false;
                         if (TestSettings.PacketDropPercentage > 0) {
                             if (TestSettings.GetNextPacketDropValue() <= TestSettings.PacketDropPercentage) {
-                                dropPacket = true;
+                                // TODO: Reenable when handling dropped packets is fixed
+                                //dropPacket = true;
                             }
                         }
 
@@ -241,7 +242,7 @@ namespace Interchange
                             if (TestSettings.SimulatedLatency > 0) {
                                 Task.Run(async () =>
                                 {
-                                    await Task.Delay(TestSettings.SimulatedLatency);
+                                    await Task.Delay(TestSettings.SimulatedLatency).ConfigureAwait(false);
                                     HandlePacketReceived(e);
 
                                     PerformReceive();
