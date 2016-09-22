@@ -33,11 +33,11 @@ namespace Interchange
 
         TaskCompletionSource<bool> connectTcs;
 
-        CancellationToken updateCancellationToken;
-
         public bool IsClient { get; private set; }
 
         bool disposed;
+
+        Timer updateTimer;
 
         public Connection<TTag> RemoteConnection {
             get {
@@ -83,8 +83,7 @@ namespace Interchange
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
 
             // Begin updating
-            updateCancellationToken = new CancellationToken();
-            Task.Run(Update, updateCancellationToken);
+            updateTimer = new Timer(new TimerCallback(Update), null, 0, 100);
         }
 
         public Packet RequestNewPacket() {
@@ -93,20 +92,10 @@ namespace Interchange
             return packet;
         }
 
-        private async Task Update() {
-            while (true) {
-                foreach (var connection in connections) {
-                    await connection.Value.Update();
-                }
-
-                await UserUpdate();
+        private void Update(object stateObject) {
+            foreach (var connection in connections) {
+                connection.Value.Update();
             }
-        }
-
-        protected virtual async Task UserUpdate() {
-            // Delay to prevent maxing CPU
-            // This behavious can be overwritten by not calling this base function
-            await Task.Delay(1);
         }
 
         /// <summary>
@@ -141,8 +130,8 @@ namespace Interchange
             return TaskInterop.CompletedTask;
         }
 
-        public async Task SendDataAsync(Connection<TTag> connection, byte[] buffer) {
-            await SendReliableDataPacket(connection, buffer);
+        public void SendDataAsync(Connection<TTag> connection, byte[] buffer) {
+            SendReliableDataPacket(connection, buffer);
         }
 
         public async Task ConnectAsync(EndPoint endPoint) {
@@ -157,7 +146,7 @@ namespace Interchange
             connectTcs = new TaskCompletionSource<bool>();
 
             await ListenAsync(IPAddress.Any, 0);
-            await SendInternalPacket(connection, MessageType.Syn);
+            SendInternalPacket(connection, MessageType.Syn);
 
             await connectTcs.Task;
         }
@@ -170,12 +159,12 @@ namespace Interchange
             connection.State = ConnectionState.Disconnecting;
             connection.DisconnectTcs = new TaskCompletionSource<bool>();
 
-            await SendClosePacket(connection);
+            SendClosePacket(connection);
             await connection.DisconnectTcs.Task;
 
             // TODO: Timeout here to prevent deadlocks
             Connection<TTag> temp;
-            while (!connections.TryRemove(connection.RemoteEndPoint, out temp)) { } 
+            while (!connections.TryRemove(connection.RemoteEndPoint, out temp)) { }
         }
 
         public async Task DisconnectAsync() {
@@ -184,7 +173,7 @@ namespace Interchange
             }
         }
 
-        internal async Task PerformSend(EndPoint endPoint, Packet packet) {
+        internal void PerformSend(EndPoint endPoint, Packet packet) {
             try {
                 // Async-void hack to prevent deadlocks (somewhere?)
                 // TODO: Fix this properly
@@ -195,7 +184,7 @@ namespace Interchange
 
                 bool willRaiseEvent = socket.SendToAsync(eventArgs);
                 if (!willRaiseEvent) {
-                    await HandlePacketSent(eventArgs);
+                    HandlePacketSent(eventArgs);
 
                     socketEventArgsPool.ReleaseObject(eventArgs);
                 }
@@ -239,7 +228,7 @@ namespace Interchange
                     PerformReceive();
                     break;
                 case SocketAsyncOperation.SendTo:
-                    await HandlePacketSent(e);
+                    HandlePacketSent(e);
                     break;
                 default:
                     throw new NotImplementedException();
@@ -268,7 +257,7 @@ namespace Interchange
                                 connection.InitializeAckNumber(header.SequenceNumber);
 
                                 // Syn-ack received, confirm and establish the connection
-                                await SendAckPacket(connection);
+                                SendAckPacket(connection);
 
                                 connection.State = ConnectionState.Connected;
 
@@ -296,12 +285,12 @@ namespace Interchange
                             }
                         case MessageType.Close: {
                                 var header = CloseHeader.FromSegment(segment);
-                                await SendAckPacket(connection, header.SequenceNumber);
+                                SendAckPacket(connection, header.SequenceNumber);
 
                                 if (connection.State == ConnectionState.Connected) {
                                     // This is the receiver - a close request packet is received from the initiator
                                     connection.State = ConnectionState.Disconnecting;
-                                    connection.DisconnectSequenceNumber = await SendClosePacket(connection);
+                                    connection.DisconnectSequenceNumber = SendClosePacket(connection);
                                 } else if (connection.State == ConnectionState.Disconnecting) {
                                     // This is the initiator - a close confirmation packet is received from the receiver
                                     connection.State = ConnectionState.Disconnected;
@@ -357,7 +346,7 @@ namespace Interchange
                                     connection.State = ConnectionState.HandshakeInitiated;
                                     connection.InitializeAckNumber(header.SequenceNumber);
 
-                                    await SendSynAckPacket(connection);
+                                    SendSynAckPacket(connection);
                                 } else {
                                     // Couldn't add to the connections dictionary - uh oh!
                                     throw new NotImplementedException();
@@ -384,7 +373,7 @@ namespace Interchange
             if (sequenceNumber == connection.AckNumber) {
                 handled = true;
 
-                await SendAckPacket(connection);
+                SendAckPacket(connection);
 
                 bool result = await ProcessIncomingMessageAction(connection, packet);
                 if (!result) {
@@ -406,34 +395,32 @@ namespace Interchange
                 // This is an old, duplicate packet
 
                 // Send the ack, then do nothing else, it has already been handled - drop it
-                await SendAckPacket(connection, sequenceNumber);
+                SendAckPacket(connection, sequenceNumber);
             } else if (sequenceNumber > connection.AckNumber) {
                 // This is a future packet, cache it for now
                 connection.CachePacket(sequenceNumber, packet);
 
                 // Ack that this packet was received, but don't increment the ack number just yet
-                await SendAckPacket(connection, sequenceNumber);
+                SendAckPacket(connection, sequenceNumber);
             }
 
             return handled;
         }
 
-        private Task HandlePacketSent(SocketAsyncEventArgs e) {
+        private void HandlePacketSent(SocketAsyncEventArgs e) {
             Packet packet = (Packet)e.UserToken;
             if (packet.CandidateForDisposal) {
                 packet.Dispose();
             }
-
-            return TaskInterop.CompletedTask;
         }
 
-        private async Task SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, Packet packet) {
+        private void SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, Packet packet) {
             connection.PacketTransmissionController.RecordPacketTransmission(sequenceNumber, connection, packet);
 
-            await PerformSend(connection.RemoteEndPoint, packet);
+            PerformSend(connection.RemoteEndPoint, packet);
         }
 
-        private async Task SendInternalPacket(Connection<TTag> connection, MessageType messageType) {
+        private void SendInternalPacket(Connection<TTag> connection, MessageType messageType) {
             var packet = RequestNewPacket();
 
             var systemHeader = new SystemHeader(messageType, 0, 0, 0);
@@ -446,10 +433,10 @@ namespace Interchange
 
             connection.IncrementSequenceNumber();
 
-            await PerformSend(connection.RemoteEndPoint, packet);
+            PerformSend(connection.RemoteEndPoint, packet);
         }
 
-        private async Task SendSynAckPacket(Connection<TTag> connection) {
+        private void SendSynAckPacket(Connection<TTag> connection) {
             var packet = RequestNewPacket();
             packet.MarkPayloadRegion(0, SystemHeader.Size + 2 + 2);
 
@@ -463,15 +450,15 @@ namespace Interchange
             connection.IncrementAckNumber();
 
             //await SendToSequenced(endPoint, sequenceNumber, buffer);
-            await PerformSend(connection.RemoteEndPoint, packet);
+            PerformSend(connection.RemoteEndPoint, packet);
         }
 
-        private async Task SendAckPacket(Connection<TTag> connection) {
-            await SendAckPacket(connection, connection.AckNumber);
+        private void SendAckPacket(Connection<TTag> connection) {
+            SendAckPacket(connection, connection.AckNumber);
             connection.IncrementAckNumber();
         }
 
-        private async Task SendAckPacket(Connection<TTag> connection, ushort ackNumber) {
+        private void SendAckPacket(Connection<TTag> connection, ushort ackNumber) {
             var packet = RequestNewPacket();
             packet.MarkPayloadRegion(0, SystemHeader.Size + 2);
 
@@ -480,10 +467,10 @@ namespace Interchange
 
             BitUtility.Write(ackNumber, packet.BackingBuffer, SystemHeader.Size);
 
-            await PerformSend(connection.RemoteEndPoint, packet);
+            PerformSend(connection.RemoteEndPoint, packet);
         }
 
-        private async Task SendReliableDataPacket(Connection<TTag> connection, byte[] buffer) {
+        private void SendReliableDataPacket(Connection<TTag> connection, byte[] buffer) {
             int payloadFragmentSize = configuration.MTU - (SystemHeader.Size + 2 + 2);
 
             byte fragmentCount = (byte)Math.Ceiling(buffer.Length / (double)payloadFragmentSize);
@@ -499,13 +486,13 @@ namespace Interchange
                     length = buffer.Length - sentBytes;
                 }
 
-                await SendReliableDataPacket(connection, buffer, sentBytes, length, packetSequenceNumber, i, fragmentCount);
+                SendReliableDataPacket(connection, buffer, sentBytes, length, packetSequenceNumber, i, fragmentCount);
 
                 sentBytes += length;
             }
         }
 
-        private async Task SendReliableDataPacket(Connection<TTag> connection, byte[] buffer, int bufferOffset, int length, ushort sequenceNumber, byte fragmentNumber, byte totalFragmentCount) {
+        private void SendReliableDataPacket(Connection<TTag> connection, byte[] buffer, int bufferOffset, int length, ushort sequenceNumber, byte fragmentNumber, byte totalFragmentCount) {
             var packet = RequestNewPacket();
             packet.MarkPayloadRegion(0, SystemHeader.Size + 2 + 2 + length);
 
@@ -516,10 +503,10 @@ namespace Interchange
             BitUtility.Write((ushort)length, packet.BackingBuffer, SystemHeader.Size + 2);
             BitUtility.Write(buffer, bufferOffset, packet.BackingBuffer, SystemHeader.Size + 2 + 2, length);
 
-            await SendToSequenced(connection, sequenceNumber, packet);
+            SendToSequenced(connection, sequenceNumber, packet);
         }
 
-        private async Task<ushort> SendClosePacket(Connection<TTag> connection) {
+        private ushort SendClosePacket(Connection<TTag> connection) {
             var packet = RequestNewPacket();
             packet.MarkPayloadRegion(0, SystemHeader.Size + 2);
 
@@ -531,7 +518,7 @@ namespace Interchange
 
             BitUtility.Write(sequenceNumber, packet.BackingBuffer, SystemHeader.Size);
 
-            await SendToSequenced(connection, sequenceNumber, packet);
+            SendToSequenced(connection, sequenceNumber, packet);
 
             return sequenceNumber;
         }

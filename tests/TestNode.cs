@@ -54,8 +54,8 @@ namespace Interchange.Tests
             await base.ConnectAsync(ServerEndPoint);
         }
 
-        public async Task SendDataAsync(byte[] buffer) {
-            await base.SendDataAsync(this.RemoteConnection, buffer);
+        public void SendDataAsync(byte[] buffer) {
+            base.SendDataAsync(this.RemoteConnection, buffer);
         }
 
         public async Task<Packet> ReadMessage() {

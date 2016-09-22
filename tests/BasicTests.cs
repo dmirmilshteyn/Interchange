@@ -128,7 +128,7 @@ namespace Interchange.Tests
 
                     for (int n = 0; n < 50; n++) {
                         for (int i = 0; i < payloads.Length; i++) {
-                            await client.SendDataAsync(payloads[i]);
+                            client.SendDataAsync(payloads[i]);
                         }
                     }
 
@@ -147,7 +147,7 @@ namespace Interchange.Tests
 
         private async Task SendPayloads(TestNode server, TestNode client, byte[][] payloads) {
             for (int i = 0; i < payloads.Length; i++) {
-                await client.SendDataAsync(payloads[i]);
+                client.SendDataAsync(payloads[i]);
                 using (var result = await server.ReadMessage()) {
 
                     Assert.True(result.Payload.SequenceEqual(payloads[i]));

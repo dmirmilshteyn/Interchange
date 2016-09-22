@@ -97,12 +97,12 @@ namespace Interchange
             this.ackNumber = ackNumber;
         }
 
-        public async Task Update() {
-           await PacketTransmissionController.ProcessRetransmissions();
+        public void Update() {
+           PacketTransmissionController.ProcessRetransmissions();
         }
 
-        public async Task SendDataAsync(byte[] buffer) {
-            await node.SendDataAsync(this, buffer);
+        public void SendDataAsync(byte[] buffer) {
+            node.SendDataAsync(this, buffer);
         }
     }
 
