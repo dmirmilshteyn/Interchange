@@ -104,16 +104,14 @@ namespace Interchange
         /// <param name="connection">The originating connection</param>
         /// <param name="packet">The full data packet</param>
         /// <returns>True if the packet has been handled; otherwise, returns false</returns>
-        protected virtual Task<bool> ProcessIncomingMessageAction(Connection<TTag> connection, Packet packet) {
-            return Task.FromResult(false);
+        protected virtual bool ProcessIncomingMessageAction(Connection<TTag> connection, Packet packet) {
+            return false;
         }
 
-        protected virtual Task ProcessConnectionAccepted(Connection<TTag> connection) {
-            return TaskInterop.CompletedTask;
+        protected virtual void ProcessConnectionAccepted(Connection<TTag> connection) {
         }
 
-        protected virtual Task ProcessConnectionDisconnected(Connection<TTag> connection) {
-            return TaskInterop.CompletedTask;
+        protected virtual void ProcessConnectionDisconnected(Connection<TTag> connection) {
         }
 
         private void Close() {
@@ -175,8 +173,6 @@ namespace Interchange
 
         internal void PerformSend(EndPoint endPoint, Packet packet) {
             try {
-                // Async-void hack to prevent deadlocks (somewhere?)
-                // TODO: Fix this properly
                 var eventArgs = socketEventArgsPool.GetObject();
                 eventArgs.RemoteEndPoint = endPoint;
                 eventArgs.SetBuffer(packet.BackingBuffer, packet.Payload.Offset, packet.Payload.Count);
@@ -195,9 +191,8 @@ namespace Interchange
             }
         }
 
-        private async void PerformReceive() {
+        private void PerformReceive() {
             try {
-                // Needs to be an async-void because it goes through the IO_Completed loop, which doesn't support tasks
                 var eventArgs = socketEventArgsPool.GetObject();
                 var packet = RequestNewPacket();
                 eventArgs.SetBuffer(packet.BackingBuffer, 0, packet.BackingBuffer.Length);
@@ -206,7 +201,7 @@ namespace Interchange
 
                 bool willRaiseEvent = socket.ReceiveFromAsync(eventArgs);
                 if (!willRaiseEvent) {
-                    await HandlePacketReceived(eventArgs);
+                    HandlePacketReceived(eventArgs);
 
                     socketEventArgsPool.ReleaseObject(eventArgs);
 
@@ -220,10 +215,10 @@ namespace Interchange
             }
         }
 
-        private async void IO_Completed(object sender, SocketAsyncEventArgs e) {
+        private void IO_Completed(object sender, SocketAsyncEventArgs e) {
             switch (e.LastOperation) {
                 case SocketAsyncOperation.ReceiveFrom:
-                    await HandlePacketReceived(e);
+                    HandlePacketReceived(e);
 
                     PerformReceive();
                     break;
@@ -237,7 +232,7 @@ namespace Interchange
             socketEventArgsPool.ReleaseObject(e);
         }
 
-        private async Task HandlePacketReceived(SocketAsyncEventArgs e) {
+        private void HandlePacketReceived(SocketAsyncEventArgs e) {
             ArraySegment<byte> segment = new ArraySegment<byte>(e.Buffer, e.Offset, e.BytesTransferred);
 
             bool handled = false;
@@ -261,7 +256,7 @@ namespace Interchange
 
                                 connection.State = ConnectionState.Connected;
 
-                                await ProcessConnectionAccepted(connection);
+                                ProcessConnectionAccepted(connection);
 
                                 connectTcs.TrySetResult(true);
                             }
@@ -272,10 +267,10 @@ namespace Interchange
                                 if (header.SequenceNumber == (ushort)(connection.AckNumber - 1) && connection.State == ConnectionState.HandshakeInitiated) {
                                     connection.State = ConnectionState.Connected;
 
-                                    await ProcessConnectionAccepted(connection);
+                                    ProcessConnectionAccepted(connection);
                                 } else if (connection.State == ConnectionState.Disconnecting && header.SequenceNumber == connection.DisconnectSequenceNumber) {
                                     connection.State = ConnectionState.Disconnected;
-                                    await ProcessConnectionDisconnected(connection);
+                                    ProcessConnectionDisconnected(connection);
                                 } else {
                                     // RecordAck will dispose the stored outgoing packet
                                     // Leave this unhandled to allow for the incoming ack packet itself to be disposed
@@ -295,7 +290,7 @@ namespace Interchange
                                     // This is the initiator - a close confirmation packet is received from the receiver
                                     connection.State = ConnectionState.Disconnected;
                                     connection.DisconnectTcs.TrySetResult(true);
-                                    await ProcessConnectionDisconnected(connection);
+                                    ProcessConnectionDisconnected(connection);
                                 }
 
                                 break;
@@ -322,13 +317,13 @@ namespace Interchange
 
                                         fragmentContainer.Dispose();
 
-                                        if (await ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, fullPacket) == false) {
+                                        if (ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, fullPacket) == false) {
                                             fullPacket.Dispose();
                                         }
                                     }
                                 } else {
                                     // This is a full packet
-                                    handled = await ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, packet);
+                                    handled = ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, packet);
                                 }
 
                                 break;
@@ -367,7 +362,7 @@ namespace Interchange
             }
         }
 
-        private async Task<bool> ProcessIncomingReliableDataPacket(Connection<TTag> connection, ushort sequenceNumber, Packet packet) {
+        private bool ProcessIncomingReliableDataPacket(Connection<TTag> connection, ushort sequenceNumber, Packet packet) {
             bool handled = false;
 
             if (sequenceNumber == connection.AckNumber) {
@@ -375,7 +370,7 @@ namespace Interchange
 
                 SendAckPacket(connection);
 
-                bool result = await ProcessIncomingMessageAction(connection, packet);
+                bool result = ProcessIncomingMessageAction(connection, packet);
                 if (!result) {
                     // Dispose the packet if it has not been handled by user code
                     packet.Dispose();
@@ -385,7 +380,7 @@ namespace Interchange
                     // Handle the future packet, but do not send another ack - the ack has already been sent
                     // Instead, only increment the ack number to indicate it was processed
                     connection.IncrementAckNumber();
-                    result = await ProcessIncomingMessageAction(connection, futurePacket);
+                    result = ProcessIncomingMessageAction(connection, futurePacket);
                     if (!result) {
                         // Dispose the packet if it has not been handled by user code
                         packet.Dispose();

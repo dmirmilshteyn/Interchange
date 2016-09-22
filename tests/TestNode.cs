@@ -22,28 +22,24 @@ namespace Interchange.Tests
             nodeStateQueue = new Queue<TestNodeState>();
         }
 
-        protected override Task<bool> ProcessIncomingMessageAction(Connection<object> connection, Packet packet) {
+        protected override bool ProcessIncomingMessageAction(Connection<object> connection, Packet packet) {
             this.packetQueue.Enqueue(packet);
 
             bufferSemaphore.Release();
 
-            return Task.FromResult(true);
+            return true;
         }
 
-        protected override Task ProcessConnectionAccepted(Connection<object> connection) {
+        protected override void ProcessConnectionAccepted(Connection<object> connection) {
             nodeStateQueue.Enqueue(TestNodeState.Connected);
 
             nodeStateSemaphore.Release();
-
-            return TaskInterop.CompletedTask;
         }
 
-        protected override Task ProcessConnectionDisconnected(Connection<object> connection) {
+        protected override void ProcessConnectionDisconnected(Connection<object> connection) {
             nodeStateQueue.Enqueue(TestNodeState.Disconnected);
 
             nodeStateSemaphore.Release();
-
-            return TaskInterop.CompletedTask;
         }
 
         public async Task ListenAsync() {
