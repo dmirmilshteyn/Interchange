@@ -39,37 +39,56 @@ namespace Interchange.Tests
 
         public static IEnumerable<object[]> MessageTestPayloads {
             get {
-                yield return new object[] {
-                    new byte[][]
-                    {
-                        new byte[] { 40, 41, 42, 43, 44 },
-                    }
+                var latencies = new int[]
+                {
+                    0, 100, 300, 1000
+                };
+                var dropPercentages = new int[]
+                {
+                    0, 20, 40, 60, 80
                 };
 
-                yield return new object[] {
-                    new byte[][]
-                    {
-                        new byte[] { 40, 41, 42, 43, 44 },
-                        new byte[] { 40, 41, 42, 43, 44, 45 }
-                    }
-                };
+                foreach (var latency in latencies) {
+                    foreach (var dropPercentage in dropPercentages) {
+                        yield return new object[] {
+                            new byte[][]
+                            {
+                                new byte[] { 40, 41, 42, 43, 44 },
+                            },
+                            latency,
+                            dropPercentage
+                        };
 
-                yield return new object[] {
-                    new byte[][]
-                    {
-                        new byte[] { 40, 41, 42, 43, 44 },
-                        new byte[] { 40, 41, 42, 43, 44, 45 },
-                        new byte[] { 40, 41, 42, 43, 44, 45, 46, 47, 48 }
+                        yield return new object[] {
+                        new byte[][]
+                            {
+                                new byte[] { 40, 41, 42, 43, 44 },
+                                new byte[] { 40, 41, 42, 43, 44, 45 }
+                            },
+                            latency,
+                            dropPercentage
+                        };
+
+                        yield return new object[] {
+                        new byte[][]
+                            {
+                                new byte[] { 40, 41, 42, 43, 44 },
+                                new byte[] { 40, 41, 42, 43, 44, 45 },
+                                new byte[] { 40, 41, 42, 43, 44, 45, 46, 47, 48 }
+                            },
+                            latency,
+                            dropPercentage
+                        };
                     }
-                };
+                }
             }
         }
 
         [Theory]
         [MemberData(nameof(MessageTestPayloads))]
-        public async Task SimpleMessageTest(byte[][] payloads) {
+        public async Task SimpleMessageTest(byte[][] payloads, int latency, int dropPercentage) {
             using (var server = new TestNode()) {
-                using (var client = new TestNode()) {
+                using (var client = new TestNode(new TestSettings(latency, dropPercentage))) {
                     await server.ListenAsync();
                     await client.ConnectAsync();
 
@@ -82,9 +101,9 @@ namespace Interchange.Tests
 
         [Theory]
         [MemberData(nameof(MessageTestPayloads))]
-        public async Task ManySimpleMessageTest(byte[][] payloads) {
+        public async Task ManySimpleMessageTest(byte[][] payloads, int latency, int dropPercentage) {
             using (var server = new TestNode()) {
-                using (var client = new TestNode()) {
+                using (var client = new TestNode(new TestSettings(latency, dropPercentage))) {
                     await server.ListenAsync();
                     await client.ConnectAsync();
 
@@ -120,9 +139,9 @@ namespace Interchange.Tests
 
         [Theory]
         [MemberData(nameof(MessageTestPayloads))]
-        public async Task ManySimpleMessageTestWithoutWaiting(byte[][] payloads) {
+        public async Task ManySimpleMessageTestWithoutWaiting(byte[][] payloads, int latency, int dropPercentage) {
             using (var server = new TestNode()) {
-                using (var client = new TestNode()) {
+                using (var client = new TestNode(new TestSettings(latency, dropPercentage))) {
                     await server.ListenAsync();
                     await client.ConnectAsync();
 
@@ -195,9 +214,9 @@ namespace Interchange.Tests
 
         [Theory]
         [MemberData(nameof(MessageTestPayloads))]
-        public async Task PoolSizeTest(byte[][] payloads) {
+        public async Task PoolSizeTest(byte[][] payloads, int latency, int dropPercentage) {
             using (var server = new TestNode()) {
-                using (var client = new TestNode()) {
+                using (var client = new TestNode(new TestSettings(latency, dropPercentage))) {
                     int startingServerPacketPoolSize = server.PacketPool.Size;
                     int startingClientPacketPoolSize = client.PacketPool.Size;
                     int startingServerSocketPoolSize = server.SocketEventArgsPool.Size;

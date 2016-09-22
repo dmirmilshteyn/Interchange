@@ -9,6 +9,13 @@ namespace Interchange
 {
     public class TestSettings
     {
+        public int SimulatedLatency { get; set; }
+        public int PacketDropPercentage { get; set; }
+
+        public TestSettings(int simulatedLatency, int packetDropPercentage) {
+            this.SimulatedLatency = simulatedLatency;
+            this.PacketDropPercentage = packetDropPercentage;
+        }
     }
 }
 
