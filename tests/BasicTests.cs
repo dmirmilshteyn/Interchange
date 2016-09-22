@@ -205,34 +205,34 @@ namespace Interchange.Tests
             }
         }
 
-        //[Theory]
-        //[MemberData(nameof(MessageTestPayloads))]
-        //public async Task PoolSizeTest(byte[][] payloads, int latency, int dropPercentage) {
-        //    using (var server = new TestNode()) {
-        //        using (var client = new TestNode(new TestSettings(latency, dropPercentage))) {
-        //            int startingServerPacketPoolSize = server.PacketPool.Size;
-        //            int startingClientPacketPoolSize = client.PacketPool.Size;
-        //            int startingServerSocketPoolSize = server.SocketEventArgsPool.Size;
-        //            int startingClientSocketPoolSize = client.SocketEventArgsPool.Size;
+        [Theory]
+        [MemberData(nameof(MessageTestPayloads))]
+        public async Task PoolSizeTest(byte[][] payloads, int latency, int dropPercentage) {
+            using (var server = new TestNode()) {
+                using (var client = new TestNode(new TestSettings(latency, dropPercentage))) {
+                    int startingServerPacketPoolSize = server.PacketPool.Size;
+                    int startingClientPacketPoolSize = client.PacketPool.Size;
+                    int startingServerSocketPoolSize = server.SocketEventArgsPool.Size;
+                    int startingClientSocketPoolSize = client.SocketEventArgsPool.Size;
 
-        //            await server.ListenAsync();
-        //            await client.ConnectAsync();
+                    await server.ListenAsync();
+                    await client.ConnectAsync();
 
-        //            await SendPayloads(server, client, payloads);
+                    await SendPayloads(server, client, payloads);
 
-        //            // Let all the pool objects be released
-        //            await Task.Delay(1);
+                    // Let all the pool objects be released
+                    await Task.Delay(1);
 
-        //            // There should be one less for both server and client because they are still listening/connected
-        //            Assert.Equal(startingServerPacketPoolSize - 1, server.PacketPool.Size);
-        //            Assert.Equal(startingClientPacketPoolSize - 1, client.PacketPool.Size);
-        //            Assert.Equal(startingServerSocketPoolSize - 1, server.SocketEventArgsPool.Size);
-        //            Assert.Equal(startingClientSocketPoolSize - 1, client.SocketEventArgsPool.Size);
+                    // There should be one less for both server and client because they are still listening/connected
+                    Assert.Equal(startingServerPacketPoolSize - 1, server.PacketPool.Size);
+                    Assert.Equal(startingClientPacketPoolSize - 1, client.PacketPool.Size);
+                    Assert.Equal(startingServerSocketPoolSize - 1, server.SocketEventArgsPool.Size);
+                    Assert.Equal(startingClientSocketPoolSize - 1, client.SocketEventArgsPool.Size);
 
-        //            await client.DisconnectAsync();
-        //        }
-        //    }
-        //}
+                    await client.DisconnectAsync();
+                }
+            }
+        }
 
         [Fact]
         public async Task ConnectDisconnectTest() {
