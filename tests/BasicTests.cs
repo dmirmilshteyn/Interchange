@@ -37,55 +37,48 @@ namespace Interchange.Tests
             }
         }
 
-        public static IEnumerable<object[]> MessageTestPayloads {
-            get {
-                var latencies = new int[]
-                {
-                    0, 100, 300, 1000
-                };
-                var dropPercentages = new int[]
-                {
-                    0, 20, 40, 60, 80
-                };
+        public static IEnumerable<object[]> MessageTestPayloads() {
+            return MessageTestPayloads(new int[] { 0 }, new int[] { 0 });
+        }
 
-                foreach (var latency in latencies) {
-                    foreach (var dropPercentage in dropPercentages) {
-                        yield return new object[] {
-                            new byte[][]
-                            {
-                                new byte[] { 40, 41, 42, 43, 44 },
-                            },
-                            latency,
-                            dropPercentage
-                        };
-
-                        yield return new object[] {
+        public static IEnumerable<object[]> MessageTestPayloads(int[] latencies, int[] dropPercentages) {
+            foreach (var latency in latencies) {
+                foreach (var dropPercentage in dropPercentages) {
+                    yield return new object[] {
                         new byte[][]
-                            {
-                                new byte[] { 40, 41, 42, 43, 44 },
-                                new byte[] { 40, 41, 42, 43, 44, 45 }
-                            },
-                            latency,
-                            dropPercentage
-                        };
+                        {
+                            new byte[] { 40, 41, 42, 43, 44 },
+                        },
+                        latency,
+                        dropPercentage
+                    };
 
-                        yield return new object[] {
+                    yield return new object[] {
                         new byte[][]
-                            {
-                                new byte[] { 40, 41, 42, 43, 44 },
-                                new byte[] { 40, 41, 42, 43, 44, 45 },
-                                new byte[] { 40, 41, 42, 43, 44, 45, 46, 47, 48 }
-                            },
-                            latency,
-                            dropPercentage
-                        };
-                    }
+                        {
+                            new byte[] { 40, 41, 42, 43, 44 },
+                            new byte[] { 40, 41, 42, 43, 44, 45 }
+                        },
+                        latency,
+                        dropPercentage
+                    };
+
+                    yield return new object[] {
+                        new byte[][]
+                        {
+                            new byte[] { 40, 41, 42, 43, 44 },
+                            new byte[] { 40, 41, 42, 43, 44, 45 },
+                            new byte[] { 40, 41, 42, 43, 44, 45, 46, 47, 48 }
+                        },
+                        latency,
+                        dropPercentage
+                    };
                 }
             }
         }
 
         [Theory]
-        [MemberData(nameof(MessageTestPayloads))]
+        [MemberData(nameof(MessageTestPayloads), new int[] { 0, 100, 300, 1000 }, new int[] { 0, 20, 40, 60, 80 })]
         public async Task SimpleMessageTest(byte[][] payloads, int latency, int dropPercentage) {
             using (var server = new TestNode()) {
                 using (var client = new TestNode(new TestSettings(latency, dropPercentage))) {
