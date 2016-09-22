@@ -12,6 +12,8 @@ namespace Interchange
         int packetDropValueCount = 0;
 
         public int SimulatedLatency { get; set; }
+
+        public bool PacketDroppingEnabled { get; set; } = false;
         public int PacketDropPercentage { get; set; }
 
         public TestSettings(int simulatedLatency, int packetDropPercentage) {

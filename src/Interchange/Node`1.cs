@@ -231,10 +231,9 @@ namespace Interchange
 #if TEST
                     if (TestSettings != null) {
                         bool dropPacket = false;
-                        if (TestSettings.PacketDropPercentage > 0) {
+                        if (TestSettings.PacketDroppingEnabled && TestSettings.PacketDropPercentage > 0) {
                             if (TestSettings.GetNextPacketDropValue() <= TestSettings.PacketDropPercentage) {
-                                // TODO: Reenable when handling dropped packets is fixed
-                                //dropPacket = true;
+                                dropPacket = true;
                             }
                         }
 

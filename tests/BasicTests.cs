@@ -85,6 +85,8 @@ namespace Interchange.Tests
                     await server.ListenAsync();
                     await client.ConnectAsync();
 
+                    client.TestSettings.PacketDroppingEnabled = true;
+
                     await SendPayloads(server, client, payloads);
 
                     await client.DisconnectAsync();
