@@ -16,7 +16,7 @@ namespace Interchange.Tests
         [InlineData(5)]
         public async Task ConnectionTest(int clientCount) {
             using (var server = new TestNode()) {
-                await server.ListenAsync();
+                server.ListenAsync();
 
                 List<TestNode> clients = new List<TestNode>(clientCount);
                 for (int i = 0; i < clientCount; i++) {
@@ -82,7 +82,7 @@ namespace Interchange.Tests
         public async Task SimpleMessageTest(byte[][] payloads, int latency, int dropPercentage) {
             using (var server = new TestNode()) {
                 using (var client = new TestNode(new TestSettings(latency, dropPercentage))) {
-                    await server.ListenAsync();
+                    server.ListenAsync();
                     await client.ConnectAsync();
 
                     client.TestSettings.PacketDroppingEnabled = true;
@@ -99,7 +99,7 @@ namespace Interchange.Tests
         public async Task ManySimpleMessageTest(byte[][] payloads, int latency, int dropPercentage) {
             using (var server = new TestNode()) {
                 using (var client = new TestNode(new TestSettings(latency, dropPercentage))) {
-                    await server.ListenAsync();
+                    server.ListenAsync();
                     await client.ConnectAsync();
 
                     for (int i = 0; i < 1000; i++) {
@@ -137,7 +137,7 @@ namespace Interchange.Tests
         public async Task ManySimpleMessageTestWithoutWaiting(byte[][] payloads, int latency, int dropPercentage) {
             using (var server = new TestNode()) {
                 using (var client = new TestNode(new TestSettings(latency, dropPercentage))) {
-                    await server.ListenAsync();
+                    server.ListenAsync();
                     await client.ConnectAsync();
 
                     for (int n = 0; n < 50; n++) {
@@ -173,7 +173,7 @@ namespace Interchange.Tests
         public async Task LargeMessageTest() {
             using (var server = new TestNode()) {
                 using (var client = new TestNode()) {
-                    await server.ListenAsync();
+                    server.ListenAsync();
                     await client.ConnectAsync();
 
                     byte[] buffer = new byte[10000];
@@ -191,7 +191,7 @@ namespace Interchange.Tests
         public async Task MultipleLargeMessageTests() {
             using (var server = new TestNode()) {
                 using (var client = new TestNode()) {
-                    await server.ListenAsync();
+                    server.ListenAsync();
                     await client.ConnectAsync();
 
                     for (int i = 0; i < 10; i++) {
@@ -217,7 +217,7 @@ namespace Interchange.Tests
                     int startingServerSocketPoolSize = server.SocketEventArgsPool.Size;
                     int startingClientSocketPoolSize = client.SocketEventArgsPool.Size;
 
-                    await server.ListenAsync();
+                    server.ListenAsync();
                     await client.ConnectAsync();
 
                     await SendPayloads(server, client, payloads);
@@ -240,7 +240,7 @@ namespace Interchange.Tests
         public async Task ConnectDisconnectTest() {
             using (var server = new TestNode()) {
                 using (var client = new TestNode()) {
-                    await server.ListenAsync();
+                    server.ListenAsync();
                     await client.ConnectAsync();
 
                     // Ensure both the client and server are connected

@@ -128,14 +128,12 @@ namespace Interchange
             socket?.Dispose();
         }
 
-        public Task ListenAsync(IPAddress localIPAddress, int port) {
+        public void ListenAsync(IPAddress localIPAddress, int port) {
             IPEndPoint ipEndPoint = new IPEndPoint(localIPAddress, port);
             socket.Bind(ipEndPoint);
 
-            // Start listening, but do not wait for it to complete before returning
+            // Start the listen loop
             PerformReceive();
-
-            return TaskInterop.CompletedTask;
         }
 
         public void SendDataAsync(Connection<TTag> connection, byte[] buffer) {
@@ -153,7 +151,7 @@ namespace Interchange
 
             connectTcs = new TaskCompletionSource<bool>();
 
-            await ListenAsync(IPAddress.Any, 0);
+            ListenAsync(IPAddress.Any, 0);
             SendInternalPacket(connection, MessageType.Syn);
 
             await connectTcs.Task;

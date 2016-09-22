@@ -47,12 +47,12 @@ namespace Interchange.Tests
             nodeStateSemaphore.Release();
         }
 
-        public async Task ListenAsync() {
-            await base.ListenAsync(IPAddress.Loopback, 5000);
+        public void ListenAsync() {
+            base.ListenAsync(IPAddress.Loopback, 5000);
         }
 
-        public async Task ConnectAsync() {
-            await base.ConnectAsync(ServerEndPoint);
+        public Task ConnectAsync() {
+            return base.ConnectAsync(ServerEndPoint);
         }
 
         public void SendDataAsync(byte[] buffer) {
