@@ -17,6 +17,9 @@ namespace Interchange.Tests
         SemaphoreSlim bufferSemaphore = new SemaphoreSlim(0);
         SemaphoreSlim nodeStateSemaphore = new SemaphoreSlim(0);
 
+        SemaphoreSlim packetQueueSemaphore = new SemaphoreSlim(1, 1);
+        SemaphoreSlim nodeStateQueueSemaphore = new SemaphoreSlim(1, 1);
+
         public TestNode() {
             packetQueue = new Queue<Packet>();
             nodeStateQueue = new Queue<TestNodeState>();
@@ -28,7 +31,9 @@ namespace Interchange.Tests
         }
 
         protected override bool ProcessIncomingMessageAction(Connection<object> connection, Packet packet) {
+            packetQueueSemaphore.Wait();
             this.packetQueue.Enqueue(packet);
+            packetQueueSemaphore.Release();
 
             bufferSemaphore.Release();
 
@@ -36,7 +41,9 @@ namespace Interchange.Tests
         }
 
         protected override void ProcessConnectionAccepted(Connection<object> connection) {
+            nodeStateQueueSemaphore.Wait();
             nodeStateQueue.Enqueue(TestNodeState.Connected);
+            nodeStateQueueSemaphore.Release();
 
             nodeStateSemaphore.Release();
         }
@@ -62,25 +69,29 @@ namespace Interchange.Tests
         public async Task<Packet> ReadMessage() {
             await bufferSemaphore.WaitAsync();
 
-            if (packetQueue.Count > 0) {
-                return packetQueue.Dequeue();
-            }
+            await packetQueueSemaphore.WaitAsync();
+            var result = packetQueue.Dequeue();
+            packetQueueSemaphore.Release();
 
-            throw new InvalidOperationException("No more messages available.");
+            return result;
         }
 
         public async Task<TestNodeState> ReadState() {
             await nodeStateSemaphore.WaitAsync();
 
-            if (nodeStateQueue.Count > 0) {
-                return nodeStateQueue.Dequeue();
-            }
+            await nodeStateQueueSemaphore.WaitAsync();
+            var result = nodeStateQueue.Dequeue();
+            nodeStateQueueSemaphore.Release();
 
-            return TestNodeState.None;
+            return result;
         }
 
         public bool IsStatesQueueEmpty() {
-            return nodeStateQueue.Count == 0;
+            nodeStateQueueSemaphore.Wait();
+            var result = nodeStateQueue.Count == 0;
+            nodeStateQueueSemaphore.Release();
+
+            return result;
         }
     }
 }
