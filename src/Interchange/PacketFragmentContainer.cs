@@ -21,13 +21,22 @@ namespace Interchange
             }
         }
 
-        public PacketFragmentContainer(ushort sequenceNumber, int totalFragmentCount) {
+        public ushort InitialSequenceNumber { get; private set; }
+
+        public ushort LastSequenceNumber {
+            get { return (ushort)(InitialSequenceNumber + packetFragments.Length); }
+        }
+
+        public PacketFragmentContainer(ushort initialSequenceNumber, int totalFragmentCount) {
+            this.InitialSequenceNumber = initialSequenceNumber;
             packetFragments = new Packet[totalFragmentCount];
         }
 
-        public bool StorePacketFragment(byte fragment, Packet packet) {
+        public bool StorePacketFragment(ushort fragmentSequenceNumber, Packet packet) {
             lock (fragmentLockObject) {
-                packetFragments[fragment] = packet;
+                int fragmentNumber = fragmentSequenceNumber - InitialSequenceNumber;
+
+                packetFragments[fragmentNumber] = packet;
 
                 return IsPacketComplete();
             }
@@ -55,7 +64,7 @@ namespace Interchange
         }
 
         public void Dispose() {
-            for (int i = 0;  i < packetFragments.Length; i++) {
+            for (int i = 0; i < packetFragments.Length; i++) {
                 if (packetFragments[i] != null) {
                     packetFragments[i].Dispose();
                 }

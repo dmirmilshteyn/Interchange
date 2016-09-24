@@ -335,39 +335,24 @@ namespace Interchange
 
                                 break;
                             }
+                        case MessageType.FragmentedReliableData: {
+                                var header = FragmentedReliableDataHeader.FromSegment(segment);
+
+                                var packet = (Packet)e.UserToken;
+                                packet.MarkPayloadRegion(segment.Offset + SystemHeader.Size + FragmentedReliableDataHeader.Size, header.PayloadSize);
+
+                                handled = ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, packet, header.TotalFragmentCount);
+                            }
+                            break;
                         case MessageType.ReliableData: {
                                 var header = ReliableDataHeader.FromSegment(segment);
 
                                 Packet packet = (Packet)e.UserToken;
-                                packet.MarkPayloadRegion(segment.Offset + SystemHeader.Size + 2 + 2, header.PayloadSize);
+                                packet.MarkPayloadRegion(segment.Offset + SystemHeader.Size + ReliableDataHeader.Size, header.PayloadSize);
 
-                                if (systemHeader.TotalFragmentCount > 1) {
-                                    var fragmentContainer = connection.RetreivePacketFragmentContainer(header.SequenceNumber, systemHeader.TotalFragmentCount);
-                                    bool packetComplete = fragmentContainer.StorePacketFragment(systemHeader.FragmentNumber, packet);
-
-                                    // Always handle this fragment to prevent the packet from being disposed prior to full assembly
-                                    handled = true;
-
-                                    if (packetComplete) {
-                                        connection.RemovePacketFragmentContainer(header.SequenceNumber);
-
-                                        var fullPacket = new Packet(null, new byte[fragmentContainer.PacketLength]);
-                                        int bytesCopied = fragmentContainer.CopyInto(fullPacket.BackingBuffer);
-                                        fullPacket.MarkPayloadRegion(0, bytesCopied);
-
-                                        fragmentContainer.Dispose();
-
-                                        if (ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, fullPacket) == false) {
-                                            fullPacket.Dispose();
-                                        }
-                                    }
-                                } else {
-                                    // This is a full packet
-                                    handled = ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, packet);
-                                }
-
-                                break;
+                                handled = ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, packet);
                             }
+                            break;
                     }
                 } else {
                     switch (systemHeader.MessageType) {
@@ -402,7 +387,7 @@ namespace Interchange
             }
         }
 
-        private bool ProcessIncomingReliableDataPacket(Connection<TTag> connection, ushort sequenceNumber, Packet packet) {
+        private bool ProcessIncomingReliableDataPacket(Connection<TTag> connection, ushort sequenceNumber, Packet packet, ushort totalFragmentCount = 0) {
             bool handled = false;
 
             if (sequenceNumber == connection.AckNumber) {
@@ -410,21 +395,14 @@ namespace Interchange
 
                 SendAckPacket(connection);
 
-                bool result = ProcessIncomingMessageAction(connection, packet);
-                if (!result) {
-                    // Dispose the packet if it has not been handled by user code
-                    packet.Dispose();
-                }
+                ProcessReliableDataPacket(connection, packet, sequenceNumber, totalFragmentCount);
 
                 foreach (var futurePacket in connection.ReleaseCachedPackets(sequenceNumber)) {
                     // Handle the future packet, but do not send another ack - the ack has already been sent
                     // Instead, only increment the ack number to indicate it was processed
                     connection.IncrementAckNumber();
-                    result = ProcessIncomingMessageAction(connection, futurePacket);
-                    if (!result) {
-                        // Dispose the packet if it has not been handled by user code
-                        packet.Dispose();
-                    }
+
+                    ProcessReliableDataPacket(connection, futurePacket.Packet, futurePacket.SequenceNumber, futurePacket.TotalFragmentCount);
                 }
             } else if (sequenceNumber < connection.AckNumber) {
                 // This is an old, duplicate packet
@@ -433,7 +411,7 @@ namespace Interchange
                 SendAckPacket(connection, sequenceNumber);
             } else if (sequenceNumber > connection.AckNumber) {
                 // This is a future packet, cache it for now
-                connection.CachePacket(sequenceNumber, packet);
+                connection.CachePacket(sequenceNumber, new CachedPacketInformation(packet, sequenceNumber, totalFragmentCount));
 
                 // Ack that this packet was received, but don't increment the ack number just yet
                 SendAckPacket(connection, sequenceNumber);
@@ -443,6 +421,45 @@ namespace Interchange
             }
 
             return handled;
+        }
+
+        private void ProcessReliableDataPacket(Connection<TTag> connection, Packet packet, ushort sequenceNumber, int totalFragmentCount) {
+            // If there is only 1 fragment, it can be treated as a standalone packet
+            if (totalFragmentCount > 1) {
+                if (connection.ActiveFragmentContainer != null) {
+                    throw new NotImplementedException("ActiveFragmentContainer is already active - malformed packet?");
+                }
+
+                connection.ActiveFragmentContainer = new PacketFragmentContainer(sequenceNumber, totalFragmentCount);
+                connection.ActiveFragmentContainer.StorePacketFragment(sequenceNumber, packet);
+            } else {
+                if (connection.ActiveFragmentContainer == null) {
+                    bool result = ProcessIncomingMessageAction(connection, packet);
+                    if (!result) {
+                        // Dispose the packet if it has not been handled by user code
+                        packet.Dispose();
+                    }
+                } else {
+                    var packetComplete = connection.ActiveFragmentContainer.StorePacketFragment(sequenceNumber, packet);
+
+                    if (packetComplete) {
+                        var fragmentContainer = connection.ActiveFragmentContainer;
+                        connection.ActiveFragmentContainer = null;
+
+                        var fullPacket = new Packet(null, new byte[fragmentContainer.PacketLength]);
+                        int bytesCopied = fragmentContainer.CopyInto(fullPacket.BackingBuffer);
+                        fullPacket.MarkPayloadRegion(0, bytesCopied);
+
+                        fragmentContainer.Dispose();
+
+                        bool result = ProcessIncomingMessageAction(connection, fullPacket);
+                        if (!result) {
+                            // Dispose the packet if it has not been handled by user code
+                            fullPacket.Dispose();
+                        }
+                    }
+                }
+            }
         }
 
         private void HandlePacketSent(SocketAsyncEventArgs e) {
@@ -461,7 +478,7 @@ namespace Interchange
         private void SendInternalPacket(Connection<TTag> connection, MessageType messageType) {
             var packet = RequestNewPacket();
 
-            var systemHeader = new SystemHeader(messageType, 0, 0, 0);
+            var systemHeader = new SystemHeader(messageType, 0);
 
             packet.MarkPayloadRegion(0, SystemHeader.Size + 2);
 
@@ -478,7 +495,7 @@ namespace Interchange
             var packet = RequestNewPacket();
             packet.MarkPayloadRegion(0, SystemHeader.Size + 2 + 2);
 
-            var systemHeader = new SystemHeader(MessageType.SynAck, 0, 0, 0);
+            var systemHeader = new SystemHeader(MessageType.SynAck, 0);
             systemHeader.WriteTo(packet);
 
             BitUtility.Write(connection.SequenceNumber, packet.BackingBuffer, SystemHeader.Size);
@@ -500,7 +517,7 @@ namespace Interchange
             var packet = RequestNewPacket();
             packet.MarkPayloadRegion(0, SystemHeader.Size + 2);
 
-            var systemHeader = new SystemHeader(MessageType.Ack, 0, 0, 0);
+            var systemHeader = new SystemHeader(MessageType.Ack, 0);
             systemHeader.WriteTo(packet);
 
             BitUtility.Write(ackNumber, packet.BackingBuffer, SystemHeader.Size);
@@ -509,37 +526,75 @@ namespace Interchange
         }
 
         private void SendReliableDataPacket(Connection<TTag> connection, byte[] buffer) {
-            int payloadFragmentSize = configuration.MTU - (SystemHeader.Size + 2 + 2);
+            int initialPayloadFragmentSize = configuration.MTU - (SystemHeader.Size + FragmentedReliableDataHeader.Size);
+            int followingFragmentsSize = configuration.MTU - (SystemHeader.Size + ReliableDataHeader.Size);
 
-            byte fragmentCount = (byte)Math.Ceiling(buffer.Length / (double)payloadFragmentSize);
-
-            ushort packetSequenceNumber = connection.SequenceNumber;
-            connection.IncrementSequenceNumber();
+            ushort fragmentCount = 0;
+            if (buffer.Length > initialPayloadFragmentSize) {
+                // Include the initial fragment header packet as part of the count
+                fragmentCount++;
+                fragmentCount += (ushort)Math.Ceiling((buffer.Length - initialPayloadFragmentSize) / (double)followingFragmentsSize);
+            }
 
             int sentBytes = 0;
-            for (byte i = 0; i < fragmentCount; i++) {
-                int length = payloadFragmentSize;
-                if (sentBytes + payloadFragmentSize > buffer.Length) {
+            ushort packetSequenceNumber = 0;
+
+            if (fragmentCount > 0) {
+                // Send the initial packet with fragment information
+                int length = initialPayloadFragmentSize;
+                if (initialPayloadFragmentSize > buffer.Length) {
+                    length = buffer.Length;
+                }
+
+                packetSequenceNumber = connection.SequenceNumber;
+                connection.IncrementSequenceNumber();
+
+                SendFragmentedReliableDataPacket(connection, buffer, sentBytes, length, packetSequenceNumber, fragmentCount);
+
+                sentBytes += length;
+            }
+
+            while (sentBytes < buffer.Length) {
+                int length = followingFragmentsSize;
+                if (sentBytes + followingFragmentsSize > buffer.Length) {
                     // This is the remainder of the packet
                     length = buffer.Length - sentBytes;
                 }
 
-                SendReliableDataPacket(connection, buffer, sentBytes, length, packetSequenceNumber, i, fragmentCount);
+                packetSequenceNumber = connection.SequenceNumber;
+                connection.IncrementSequenceNumber();
+
+                SendReliableDataPacket(connection, buffer, sentBytes, length, packetSequenceNumber);
 
                 sentBytes += length;
             }
         }
 
-        private void SendReliableDataPacket(Connection<TTag> connection, byte[] buffer, int bufferOffset, int length, ushort sequenceNumber, byte fragmentNumber, byte totalFragmentCount) {
+        private void SendFragmentedReliableDataPacket(Connection<TTag> connection, byte[] buffer, int bufferOffset, int length, ushort sequenceNumber, ushort totalFragmentCount) {
             var packet = RequestNewPacket();
-            packet.MarkPayloadRegion(0, SystemHeader.Size + 2 + 2 + length);
+            packet.MarkPayloadRegion(0, SystemHeader.Size + FragmentedReliableDataHeader.Size + length);
 
-            var systemHeader = new SystemHeader(MessageType.ReliableData, fragmentNumber, totalFragmentCount, 0);
+            var systemHeader = new SystemHeader(MessageType.FragmentedReliableData, 0);
             systemHeader.WriteTo(packet);
 
             BitUtility.Write(sequenceNumber, packet.BackingBuffer, SystemHeader.Size);
             BitUtility.Write((ushort)length, packet.BackingBuffer, SystemHeader.Size + 2);
-            BitUtility.Write(buffer, bufferOffset, packet.BackingBuffer, SystemHeader.Size + 2 + 2, length);
+            BitUtility.Write(totalFragmentCount, packet.BackingBuffer, SystemHeader.Size + 2 + 2);
+            BitUtility.Write(buffer, bufferOffset, packet.BackingBuffer, SystemHeader.Size + FragmentedReliableDataHeader.Size, length);
+
+            SendToSequenced(connection, sequenceNumber, packet);
+        }
+
+        private void SendReliableDataPacket(Connection<TTag> connection, byte[] buffer, int bufferOffset, int length, ushort sequenceNumber) {
+            var packet = RequestNewPacket();
+            packet.MarkPayloadRegion(0, SystemHeader.Size + ReliableDataHeader.Size + length);
+
+            var systemHeader = new SystemHeader(MessageType.ReliableData, 0);
+            systemHeader.WriteTo(packet);
+
+            BitUtility.Write(sequenceNumber, packet.BackingBuffer, SystemHeader.Size);
+            BitUtility.Write((ushort)length, packet.BackingBuffer, SystemHeader.Size + 2);
+            BitUtility.Write(buffer, bufferOffset, packet.BackingBuffer, SystemHeader.Size + ReliableDataHeader.Size, length);
 
             SendToSequenced(connection, sequenceNumber, packet);
         }
@@ -548,7 +603,7 @@ namespace Interchange
             var packet = RequestNewPacket();
             packet.MarkPayloadRegion(0, SystemHeader.Size + 2);
 
-            var systemHeader = new SystemHeader(MessageType.Close, 0, 0, 0);
+            var systemHeader = new SystemHeader(MessageType.Close, 0);
             systemHeader.WriteTo(packet);
 
             ushort sequenceNumber = connection.SequenceNumber;

@@ -12,6 +12,7 @@ namespace Interchange
         SynAck = 3,
         Close = 4,
 
+        FragmentedReliableData = 127,
         ReliableData = 128
     }
 }

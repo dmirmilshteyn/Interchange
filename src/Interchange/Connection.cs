@@ -34,8 +34,8 @@ namespace Interchange
 
         Node<TTag> node;
 
-        ConcurrentDictionary<ushort, Packet> packetCache;
-        Dictionary<ushort, PacketFragmentContainer> fragmentCache;
+        ConcurrentDictionary<ushort, CachedPacketInformation> packetCache;
+        internal PacketFragmentContainer ActiveFragmentContainer { get; set; }
 
         public Connection(Node<TTag> node, EndPoint remoteEndPoint) {
             this.RemoteEndPoint = remoteEndPoint;
@@ -45,39 +45,20 @@ namespace Interchange
             this.sequenceNumber = InitialSequenceNumber = 0;//random.Next(ushort.MaxValue, ushort.MaxValue + 1);
 
             PacketTransmissionController = new PacketTransmissionController<TTag>(node);
-            packetCache = new ConcurrentDictionary<ushort, Packet>();
-            fragmentCache = new Dictionary<ushort, PacketFragmentContainer>();
+            packetCache = new ConcurrentDictionary<ushort, CachedPacketInformation>();
         }
 
-        internal PacketFragmentContainer RetreivePacketFragmentContainer(ushort sequenceNumber, byte totalFragmentCount) {
-            PacketFragmentContainer fragmentContainer;
-            lock (fragmentCache) {
-                if (!fragmentCache.TryGetValue(sequenceNumber, out fragmentContainer)) {
-                    fragmentContainer = new PacketFragmentContainer(sequenceNumber, totalFragmentCount);
-                    fragmentCache.Add(sequenceNumber, fragmentContainer);
-                }
-            }
-
-            return fragmentContainer;
+        internal void CachePacket(ushort sequenceNumber, CachedPacketInformation packetInformation) {
+            packetCache.TryAdd(sequenceNumber, packetInformation);
         }
 
-        internal void RemovePacketFragmentContainer(ushort sequenceNumber) {
-            lock (fragmentCache) {
-                fragmentCache.Remove(sequenceNumber);
-            }
-        }
-
-        internal void CachePacket(ushort sequenceNumber, Packet packet) {
-            packetCache.TryAdd(sequenceNumber, packet);
-        }
-
-        internal IEnumerable<Packet> ReleaseCachedPackets(ushort currentSequenceNumber) {
+        internal IEnumerable<CachedPacketInformation> ReleaseCachedPackets(ushort currentSequenceNumber) {
             // Check if the next packet is in the cache
             currentSequenceNumber++;
             while (packetCache.Count > 0) {
-                Packet packet = null;
-                if (packetCache.TryRemove(currentSequenceNumber, out packet)) {
-                    yield return packet;
+                CachedPacketInformation packetInformation;
+                if (packetCache.TryRemove(currentSequenceNumber, out packetInformation)) {
+                    yield return packetInformation;
                     // Try the next packet
                 } else {
                     break;
@@ -98,22 +79,11 @@ namespace Interchange
         }
 
         public void Update() {
-           PacketTransmissionController.ProcessRetransmissions();
+            PacketTransmissionController.ProcessRetransmissions();
         }
 
         public void SendDataAsync(byte[] buffer) {
             node.SendDataAsync(this, buffer);
-        }
-    }
-
-    internal struct CachedPacket
-    {
-        public readonly ushort SequenceNumber;
-        public readonly Packet Packet;
-
-        public CachedPacket(ushort sequenceNumber, Packet packet) {
-            SequenceNumber = sequenceNumber;
-            Packet = packet;
         }
     }
 }
