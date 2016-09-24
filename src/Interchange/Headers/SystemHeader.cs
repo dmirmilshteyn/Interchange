@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Interchange.Headers
 {
-    public struct SystemHeader
+    public struct SystemHeader : IHeader
     {
         public readonly byte ChannelNumber;
         public readonly MessageType MessageType;
@@ -24,17 +24,9 @@ namespace Interchange.Headers
             this.ChannelNumber = channelNumber;
         }
 
-        public void WriteTo(Packet packet) {
-            WriteTo(packet.BackingBuffer);
-        }
-
         public void WriteTo(byte[] buffer, int offset) {
             buffer[offset] = (byte)MessageType;
             buffer[offset + 1] = PackPayload();
-        }
-
-        public void WriteTo(byte[] buffer) {
-            WriteTo(buffer, 0);
         }
 
         private byte PackPayload() {

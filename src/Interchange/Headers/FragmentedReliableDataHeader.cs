@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Interchange.Headers
 {
-    public struct FragmentedReliableDataHeader
+    public struct FragmentedReliableDataHeader : IHeader
     {
         public readonly ushort SequenceNumber;
         public readonly ushort PayloadSize;
@@ -21,7 +21,7 @@ namespace Interchange.Headers
             }
         }
 
-        private FragmentedReliableDataHeader(ushort sequenceNumber, ushort payloadSize, ushort totalFragmentCount) {
+        public FragmentedReliableDataHeader(ushort sequenceNumber, ushort payloadSize, ushort totalFragmentCount) {
             this.SequenceNumber = sequenceNumber;
             this.PayloadSize = payloadSize;
             this.TotalFragmentCount = totalFragmentCount;
@@ -33,6 +33,12 @@ namespace Interchange.Headers
             ushort totalFragmentCount = (ushort)BitConverter.ToInt16(segment.Array, segment.Offset + SystemHeader.Size + 2 + 2);
 
             return new FragmentedReliableDataHeader(sequenceNumber, payloadSize, totalFragmentCount);
+        }
+
+        public void WriteTo(byte[] buffer, int offset) {
+            BitUtility.Write(SequenceNumber, buffer, offset);
+            BitUtility.Write((ushort)PayloadSize, buffer, offset + 2);
+            BitUtility.Write(TotalFragmentCount, buffer, offset + 2 + 2);
         }
     }
 }

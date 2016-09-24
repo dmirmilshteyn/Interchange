@@ -577,9 +577,9 @@ namespace Interchange
             var systemHeader = new SystemHeader(MessageType.FragmentedReliableData, 0);
             systemHeader.WriteTo(packet);
 
-            BitUtility.Write(sequenceNumber, packet.BackingBuffer, SystemHeader.Size);
-            BitUtility.Write((ushort)length, packet.BackingBuffer, SystemHeader.Size + 2);
-            BitUtility.Write(totalFragmentCount, packet.BackingBuffer, SystemHeader.Size + 2 + 2);
+            var fragmentedReliableDataHeader = new FragmentedReliableDataHeader(sequenceNumber, (ushort)length, totalFragmentCount);
+            fragmentedReliableDataHeader.WriteTo(packet.BackingBuffer, SystemHeader.Size);
+
             BitUtility.Write(buffer, bufferOffset, packet.BackingBuffer, SystemHeader.Size + FragmentedReliableDataHeader.Size, length);
 
             SendToSequenced(connection, sequenceNumber, packet);
@@ -592,8 +592,9 @@ namespace Interchange
             var systemHeader = new SystemHeader(MessageType.ReliableData, 0);
             systemHeader.WriteTo(packet);
 
-            BitUtility.Write(sequenceNumber, packet.BackingBuffer, SystemHeader.Size);
-            BitUtility.Write((ushort)length, packet.BackingBuffer, SystemHeader.Size + 2);
+            var reliableDataHeader = new ReliableDataHeader(sequenceNumber, (ushort)length);
+            reliableDataHeader.WriteTo(packet.BackingBuffer, SystemHeader.Size);
+            
             BitUtility.Write(buffer, bufferOffset, packet.BackingBuffer, SystemHeader.Size + ReliableDataHeader.Size, length);
 
             SendToSequenced(connection, sequenceNumber, packet);
