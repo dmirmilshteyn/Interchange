@@ -530,7 +530,7 @@ namespace Interchange
             int followingFragmentsSize = configuration.MTU - (SystemHeader.Size + ReliableDataHeader.Size);
 
             ushort fragmentCount = 0;
-            if (buffer.Length > initialPayloadFragmentSize) {
+            if (buffer.Length > followingFragmentsSize) { // If the payload can't fit in a regular reliable data packet, fragment it
                 // Include the initial fragment header packet as part of the count
                 fragmentCount++;
                 fragmentCount += (ushort)Math.Ceiling((buffer.Length - initialPayloadFragmentSize) / (double)followingFragmentsSize);
