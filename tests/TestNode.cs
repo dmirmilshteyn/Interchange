@@ -49,7 +49,9 @@ namespace Interchange.Tests
         }
 
         protected override void ProcessConnectionDisconnected(Connection<object> connection) {
+            nodeStateQueueSemaphore.Wait();
             nodeStateQueue.Enqueue(TestNodeState.Disconnected);
+            nodeStateQueueSemaphore.Release();
 
             nodeStateSemaphore.Release();
         }
