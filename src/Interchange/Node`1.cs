@@ -209,12 +209,7 @@ namespace Interchange
 
                 bool willRaiseEvent = socket.ReceiveFromAsync(eventArgs);
                 if (!willRaiseEvent) {
-                    HandlePacketReceived(eventArgs);
-
-                    socketEventArgsPool.ReleaseObject(eventArgs);
-
-                    // Continue listening for new packets
-                    PerformReceive();
+                    HandleReceiveIOCompleted(eventArgs);
                 }
             } catch (ObjectDisposedException) {
                 // TODO: Properly dispose of this object
@@ -223,51 +218,56 @@ namespace Interchange
             }
         }
 
-        private void IO_Completed(object sender, SocketAsyncEventArgs e) {
-            switch (e.LastOperation) {
-                case SocketAsyncOperation.ReceiveFrom:
+        private void HandleReceiveIOCompleted(SocketAsyncEventArgs e) {
 #if TEST
-                    if (TestSettings != null) {
-                        bool dropPacket = false;
-                        if (TestSettings.PacketDroppingEnabled && TestSettings.PacketDropPercentage > 0) {
-                            if (TestSettings.GetNextPacketDropValue() <= TestSettings.PacketDropPercentage) {
-                                dropPacket = true;
-                            }
-                        }
+            if (TestSettings != null) {
+                bool dropPacket = false;
+                if (TestSettings.PacketDroppingEnabled && TestSettings.PacketDropPercentage > 0) {
+                    if (TestSettings.GetNextPacketDropValue() <= TestSettings.PacketDropPercentage) {
+                        dropPacket = true;
+                    }
+                }
 
-                        if (!dropPacket) {
-                            if (TestSettings.SimulatedLatency > 0) {
-                                Task.Run(async () =>
-                                {
-                                    await Task.Delay(TestSettings.SimulatedLatency).ConfigureAwait(false);
-                                    HandlePacketReceived(e);
+                if (!dropPacket) {
+                    if (TestSettings.SimulatedLatency > 0) {
+                        Task.Run(async () =>
+                        {
+                            await Task.Delay(TestSettings.SimulatedLatency).ConfigureAwait(false);
+                            HandlePacketReceived(e);
 
-                                    PerformReceive();
-                                    socketEventArgsPool.ReleaseObject(e);
-                                });
+                            PerformReceive();
+                            socketEventArgsPool.ReleaseObject(e);
+                        });
 
-                                return;
-                            } else {
-                                HandlePacketReceived(e);
-                            }
-                        }
+                        return;
                     } else {
                         HandlePacketReceived(e);
                     }
+                }
+            } else {
+                HandlePacketReceived(e);
+            }
 #else
-                    HandlePacketReceived(e);
+            HandlePacketReceived(e);
 #endif
 
-                    PerformReceive();
+            PerformReceive();
+
+            socketEventArgsPool.ReleaseObject(e);
+        }
+
+        private void IO_Completed(object sender, SocketAsyncEventArgs e) {
+            switch (e.LastOperation) {
+                case SocketAsyncOperation.ReceiveFrom:
+                    HandleReceiveIOCompleted(e);
                     break;
                 case SocketAsyncOperation.SendTo:
                     HandlePacketSent(e);
+                    socketEventArgsPool.ReleaseObject(e);
                     break;
                 default:
                     throw new NotImplementedException();
             }
-
-            socketEventArgsPool.ReleaseObject(e);
         }
 
         private void HandlePacketReceived(SocketAsyncEventArgs e) {
