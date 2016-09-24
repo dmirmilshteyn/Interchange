@@ -437,6 +437,9 @@ namespace Interchange
 
                 // Ack that this packet was received, but don't increment the ack number just yet
                 SendAckPacket(connection, sequenceNumber);
+
+                // Prevent the packet from being disposed immediately
+                handled = true;
             }
 
             return handled;
