@@ -142,7 +142,7 @@ namespace Interchange
 
         public async Task ConnectAsync(EndPoint endPoint) {
             var connection = new Connection<TTag>(this, endPoint);
-            if (!connections.TryAdd(endPoint, connection)) {
+            if (!TryAddConnection(endPoint, connection)) {
                 // TODO: Couldn't add the connection
                 throw new NotImplementedException();
             }
@@ -167,16 +167,44 @@ namespace Interchange
 
             SendClosePacket(connection);
             await connection.DisconnectTcs.Task;
-
-            // TODO: Timeout here to prevent deadlocks
-            Connection<TTag> temp;
-            while (!connections.TryRemove(connection.RemoteEndPoint, out temp)) { }
         }
 
         public async Task DisconnectAsync() {
             foreach (var connection in Connections) {
                 await DisconnectAsync(connection);
             }
+        }
+
+        private void BindEvents(Connection<TTag> connection) {
+            connection.ConnectionLost += Connection_ConnectionLost;
+        }
+
+        private void UnbindEvents(Connection<TTag> connection) {
+            connection.ConnectionLost -= Connection_ConnectionLost;
+        }
+
+        private bool TryAddConnection(EndPoint endPoint, Connection<TTag> connection) {
+            if (connections.TryAdd(endPoint, connection)) {
+                BindEvents(connection);
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private void RemoveConnection(Connection<TTag> connection) {
+            UnbindEvents(connection);
+
+            // TODO: Timeout here to prevent deadlocks
+            Connection<TTag> temp;
+            while (!connections.TryRemove(connection.RemoteEndPoint, out temp)) { }
+
+            ProcessConnectionDisconnected(connection);
+        }
+
+        private void Connection_ConnectionLost(object sender, EventArgs e) {
+            RemoveConnection((Connection<TTag>)sender);
         }
 
         internal void PerformSend(EndPoint endPoint, Packet packet) {
@@ -308,7 +336,7 @@ namespace Interchange
                                     ProcessConnectionAccepted(connection);
                                 } else if (connection.State == ConnectionState.Disconnecting && header.SequenceNumber == connection.DisconnectSequenceNumber) {
                                     connection.State = ConnectionState.Disconnected;
-                                    ProcessConnectionDisconnected(connection);
+                                    RemoveConnection(connection);
                                 } else {
                                     // RecordAck will dispose the stored outgoing packet
                                     // Leave this unhandled to allow for the incoming ack packet itself to be disposed
@@ -326,11 +354,7 @@ namespace Interchange
                                     connection.DisconnectSequenceNumber = SendClosePacket(connection);
                                 } else if (connection.State == ConnectionState.Disconnecting) {
                                     // This is the initiator - a close confirmation packet is received from the receiver
-                                    connection.State = ConnectionState.Disconnected;
-                                    if (connection.DisconnectTcs != null) {
-                                        connection.DisconnectTcs.TrySetResult(true);
-                                    }
-                                    ProcessConnectionDisconnected(connection);
+                                    connection.TriggerConnectionLost();
                                 }
 
                                 break;
@@ -361,7 +385,7 @@ namespace Interchange
 
                                 // Received a connection attempt
                                 connection = new Connection<TTag>(this, e.RemoteEndPoint);
-                                if (connections.TryAdd(e.RemoteEndPoint, connection)) {
+                                if (TryAddConnection(e.RemoteEndPoint, connection)) {
                                     // TODO: All good, raise events
                                     connection.State = ConnectionState.HandshakeInitiated;
                                     connection.InitializeAckNumber(header.SequenceNumber);
@@ -470,7 +494,7 @@ namespace Interchange
         }
 
         private void SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, Packet packet) {
-            connection.PacketTransmissionController.RecordPacketTransmission(sequenceNumber, connection, packet);
+            connection.PacketTransmissionController.RecordPacketTransmissionAndEnqueue(sequenceNumber, connection, packet);
 
             PerformSend(connection.RemoteEndPoint, packet);
         }

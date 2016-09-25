@@ -169,6 +169,14 @@ namespace Interchange.Tests
             }
         }
 
+        private byte[] GenerateRandomBytes(int length) {
+            var buffer = new byte[length];
+            var rand = new Random();
+            rand.NextBytes(buffer);
+
+            return buffer;
+        }
+
         [Fact]
         public async Task LargeMessageTest() {
             using (var server = new TestNode()) {
@@ -263,6 +271,30 @@ namespace Interchange.Tests
                     Assert.Equal(result, TestNodeState.Disconnected);
                     Assert.True(server.IsStatesQueueEmpty());
                 }
+            }
+        }
+
+        [Fact]
+        public async Task TestDroppedConnection() {
+            using (var server = new TestNode()) {
+                server.ListenAsync();
+
+                var client = new TestNode();
+                await client.ConnectAsync();
+
+                var result = await server.ReadState();
+                Assert.Equal(result, TestNodeState.Connected);
+                Assert.True(server.IsStatesQueueEmpty());
+
+                // Dispose, not a clean disconnect
+                client.Dispose();
+
+                var payload = GenerateRandomBytes(100);
+                server.SendDataAsync(payload);
+
+                result = await server.ReadState();
+                Assert.Equal(result, TestNodeState.Disconnected);
+                Assert.True(server.IsStatesQueueEmpty());
             }
         }
 

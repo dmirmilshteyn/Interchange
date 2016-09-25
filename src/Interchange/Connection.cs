@@ -34,6 +34,8 @@ namespace Interchange
 
         Node<TTag> node;
 
+        internal event EventHandler ConnectionLost;
+
         ConcurrentDictionary<ushort, CachedPacketInformation> packetCache;
         internal PacketFragmentContainer ActiveFragmentContainer { get; set; }
 
@@ -44,7 +46,7 @@ namespace Interchange
             // TODO: Randomize this
             this.sequenceNumber = InitialSequenceNumber = 0;//random.Next(ushort.MaxValue, ushort.MaxValue + 1);
 
-            PacketTransmissionController = new PacketTransmissionController<TTag>(node);
+            PacketTransmissionController = new PacketTransmissionController<TTag>(this, node);
             packetCache = new ConcurrentDictionary<ushort, CachedPacketInformation>();
         }
 
@@ -84,6 +86,12 @@ namespace Interchange
 
         public void SendDataAsync(byte[] buffer) {
             node.SendDataAsync(this, buffer);
+        }
+
+        internal void TriggerConnectionLost() {
+            this.State = ConnectionState.Disconnected;
+            ConnectionLost?.Invoke(this, EventArgs.Empty);
+            DisconnectTcs?.TrySetResult(true);
         }
     }
 }
