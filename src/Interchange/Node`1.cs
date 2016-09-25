@@ -308,79 +308,77 @@ namespace Interchange
 
                 Connection<TTag> connection;
                 if (connections.TryGetValue(e.RemoteEndPoint, out connection)) {
-                    switch (systemHeader.MessageType) {
-                        case MessageType.Syn:
-                            // TODO: Reject the connection, already connected!
-                            throw new NotImplementedException();
-                        case MessageType.SynAck: {
-                                var header = SynAckHeader.FromSegment(segment);
+                    lock (connection) {
+                        switch (systemHeader.MessageType) {
+                            case MessageType.Syn:
+                                // TODO: Reject the connection, already connected!
+                                throw new NotImplementedException();
+                            case MessageType.SynAck: {
+                                    var header = SynAckHeader.FromSegment(segment);
 
-                                connection.InitializeAckNumber(header.SequenceNumber);
+                                    connection.InitializeAckNumber(header.SequenceNumber);
 
-                                // Syn-ack received, confirm and establish the connection
-                                SendAckPacket(connection);
+                                    // Syn-ack received, confirm and establish the connection
+                                    SendAckPacket(connection);
 
-                                connection.State = ConnectionState.Connected;
-
-                                ProcessConnectionAccepted(connection);
-
-                                connectTcs.TrySetResult(true);
-                            }
-                            break;
-                        case MessageType.Ack: {
-                                var header = AckHeader.FromSegment(segment);
-
-                                if (header.SequenceNumber == (ushort)(connection.AckNumber - 1) && connection.State == ConnectionState.HandshakeInitiated) {
                                     connection.State = ConnectionState.Connected;
 
                                     ProcessConnectionAccepted(connection);
-                                } else if (connection.State == ConnectionState.Disconnecting && header.SequenceNumber == connection.DisconnectSequenceNumber) {
-                                    connection.State = ConnectionState.Disconnected;
-                                    RemoveConnection(connection);
-                                } else {
-                                    // RecordAck will dispose the stored outgoing packet
-                                    // Leave this unhandled to allow for the incoming ack packet itself to be disposed
-                                    connection.PacketTransmissionController.RecordAck(connection, header.SequenceNumber);
+
+                                    connectTcs.TrySetResult(true);
                                 }
                                 break;
-                            }
-                        case MessageType.Close: {
-                                var header = CloseHeader.FromSegment(segment);
-                                SendAckPacket(connection, header.SequenceNumber);
+                            case MessageType.Ack: {
+                                    var header = AckHeader.FromSegment(segment);
 
-                                if (connection.State == ConnectionState.Connected) {
-                                    // This is the receiver - a close request packet is received from the initiator
-                                    connection.State = ConnectionState.Disconnecting;
-                                    connection.DisconnectSequenceNumber = SendClosePacket(connection);
-                                } else if (connection.State == ConnectionState.Disconnecting) {
-                                    // This is the initiator - a close confirmation packet is received from the receiver
-                                    connection.TriggerConnectionLost();
+                                    if (header.SequenceNumber == (ushort)(connection.AckNumber - 1) && connection.State == ConnectionState.HandshakeInitiated) {
+                                        connection.State = ConnectionState.Connected;
+
+                                        ProcessConnectionAccepted(connection);
+                                    } else if (connection.State == ConnectionState.Disconnecting && header.SequenceNumber == connection.DisconnectSequenceNumber) {
+                                        connection.State = ConnectionState.Disconnected;
+                                        RemoveConnection(connection);
+                                    } else {
+                                        // RecordAck will dispose the stored outgoing packet
+                                        // Leave this unhandled to allow for the incoming ack packet itself to be disposed
+                                        connection.PacketTransmissionController.RecordAck(connection, header.SequenceNumber);
+                                    }
+                                    break;
                                 }
+                            case MessageType.Close: {
+                                    var header = CloseHeader.FromSegment(segment);
+                                    SendAckPacket(connection, header.SequenceNumber);
 
-                                break;
-                            }
-                        case MessageType.FragmentedReliableData: {
-                                var header = FragmentedReliableDataHeader.FromSegment(segment);
+                                    if (connection.State == ConnectionState.Connected) {
+                                        // This is the receiver - a close request packet is received from the initiator
+                                        connection.State = ConnectionState.Disconnecting;
+                                        connection.DisconnectSequenceNumber = SendClosePacket(connection);
+                                    } else if (connection.State == ConnectionState.Disconnecting) {
+                                        // This is the initiator - a close confirmation packet is received from the receiver
+                                        connection.TriggerConnectionLost();
+                                    }
 
-                                var packet = (Packet)e.UserToken;
-                                packet.MarkPayloadRegion(segment.Offset + SystemHeader.Size + FragmentedReliableDataHeader.Size, header.PayloadSize);
+                                    break;
+                                }
+                            case MessageType.FragmentedReliableData: {
+                                    var header = FragmentedReliableDataHeader.FromSegment(segment);
 
-                                lock (connection) {
+                                    var packet = (Packet)e.UserToken;
+                                    packet.MarkPayloadRegion(segment.Offset + SystemHeader.Size + FragmentedReliableDataHeader.Size, header.PayloadSize);
+
                                     handled = ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, packet, header.TotalFragmentCount);
                                 }
-                            }
-                            break;
-                        case MessageType.ReliableData: {
-                                var header = ReliableDataHeader.FromSegment(segment);
+                                break;
+                            case MessageType.ReliableData: {
+                                    var header = ReliableDataHeader.FromSegment(segment);
 
-                                Packet packet = (Packet)e.UserToken;
-                                packet.MarkPayloadRegion(segment.Offset + SystemHeader.Size + ReliableDataHeader.Size, header.PayloadSize);
+                                    Packet packet = (Packet)e.UserToken;
+                                    packet.MarkPayloadRegion(segment.Offset + SystemHeader.Size + ReliableDataHeader.Size, header.PayloadSize);
 
-                                lock (connection) {
                                     handled = ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, packet);
                                 }
-                            }
-                            break;
+                                break;
+                        }
                     }
                 } else {
                     switch (systemHeader.MessageType) {
@@ -622,7 +620,7 @@ namespace Interchange
 
             var reliableDataHeader = new ReliableDataHeader(sequenceNumber, (ushort)length);
             reliableDataHeader.WriteTo(packet.BackingBuffer, SystemHeader.Size);
-            
+
             BitUtility.Write(buffer, bufferOffset, packet.BackingBuffer, SystemHeader.Size + ReliableDataHeader.Size, length);
 
             SendToSequenced(connection, sequenceNumber, packet);
