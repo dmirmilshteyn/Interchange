@@ -365,7 +365,9 @@ namespace Interchange
                                 var packet = (Packet)e.UserToken;
                                 packet.MarkPayloadRegion(segment.Offset + SystemHeader.Size + FragmentedReliableDataHeader.Size, header.PayloadSize);
 
-                                handled = ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, packet, header.TotalFragmentCount);
+                                lock (connection) {
+                                    handled = ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, packet, header.TotalFragmentCount);
+                                }
                             }
                             break;
                         case MessageType.ReliableData: {
@@ -374,7 +376,9 @@ namespace Interchange
                                 Packet packet = (Packet)e.UserToken;
                                 packet.MarkPayloadRegion(segment.Offset + SystemHeader.Size + ReliableDataHeader.Size, header.PayloadSize);
 
-                                handled = ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, packet);
+                                lock (connection) {
+                                    handled = ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, packet);
+                                }
                             }
                             break;
                     }
