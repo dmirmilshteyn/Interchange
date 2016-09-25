@@ -18,6 +18,7 @@ namespace Interchange
         public int SequenceNumber { get; private set; }
 
         private object processRetransmissionsLock = new object();
+        private object packetTransmissionsLock = new object();
 
         public PacketTransmissionController(Connection<TTag> connection, Node<TTag> node) {
             this.WindowSize = 1024;
@@ -42,30 +43,38 @@ namespace Interchange
 
             int position = CalculatePosition(sequenceNumber, connection);
 
+            lock (packetTransmissionsLock) {
+                RecordPacketTransmissionUnsafe(position, sequenceNumber, connection, packet);
+            }
+
+            return position;
+        }
+
+        private void RecordPacketTransmissionUnsafe(int position, ushort sequenceNumber, Connection<TTag> connection, Packet packet) {
             packetTransmissions[position].Acked = false;
             packetTransmissions[position].Packet = packet;
             packetTransmissions[position].Connection = connection;
             packetTransmissions[position].SequenceNumber = sequenceNumber;
             packetTransmissions[position].LastTransmissionTime = DateTime.UtcNow.ToBinary();
             packetTransmissions[position].SendCount += 1;
-
-            return position;
         }
 
         public void RecordAck(Connection<TTag> connection, int ackNumber) {
             ushort position = CalculatePosition((ushort)ackNumber, connection);
 
-            packetTransmissions[position].SendCount = 0;
+            lock (packetTransmissionsLock) {
+                packetTransmissions[position].SendCount = 0;
 
-            if (!packetTransmissions[position].Acked) {
-                packetTransmissions[position].Acked = true;
+                if (!packetTransmissions[position].Acked) {
+                    packetTransmissions[position].Acked = true;
 
-                // Only dispose the packet once it has been confirmed that the other side received it
-                packetTransmissions[position].Packet.Dispose();
+                    // Only dispose the packet once it has been confirmed that the other side received it
+                    packetTransmissions[position].Packet.Dispose();
 
-                // Got ack
-            } else {
-                // Got duplicate ack
+                    // Got ack
+                } else {
+                    // Got duplicate ack
+                }
             }
         }
 
@@ -74,19 +83,21 @@ namespace Interchange
                 if (packetTransmissionOrder.Count > 0) {
                     int position = packetTransmissionOrder.Peek();
 
-                    var transmissionObject = packetTransmissions[position];
-                    if (transmissionObject.Acked) {
-                        packetTransmissionOrder.Dequeue();
-                    } else if (transmissionObject.SendCount > 5) {
-                        connection.TriggerConnectionLost();
-                    } else if (DateTime.UtcNow >= DateTime.FromBinary(transmissionObject.LastTransmissionTime).AddMilliseconds(transmissionObject.DetermineSendWaitPeriod())) {
-                        packetTransmissionOrder.Dequeue();
+                    lock (packetTransmissionsLock) {
+                        var transmissionObject = packetTransmissions[position];
+                        if (transmissionObject.Acked) {
+                            packetTransmissionOrder.Dequeue();
+                        } else if (transmissionObject.SendCount > 5) {
+                            connection.TriggerConnectionLost();
+                        } else if (DateTime.UtcNow >= DateTime.FromBinary(transmissionObject.LastTransmissionTime).AddMilliseconds(transmissionObject.DetermineSendWaitPeriod())) {
+                            packetTransmissionOrder.Dequeue();
 
-                        node.PerformSend(transmissionObject.Connection.RemoteEndPoint, transmissionObject.Packet);
+                            node.PerformSend(transmissionObject.Connection.RemoteEndPoint, transmissionObject.Packet);
 
-                        RecordPacketTransmission(transmissionObject.SequenceNumber, transmissionObject.Connection, transmissionObject.Packet);
+                            RecordPacketTransmissionUnsafe(position, transmissionObject.SequenceNumber, transmissionObject.Connection, transmissionObject.Packet);
 
-                        packetTransmissionOrder.Enqueue(position);
+                            packetTransmissionOrder.Enqueue(position);
+                        }
                     }
                 }
             }
