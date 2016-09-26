@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Interchange.Tests
 {
-    public class BasicTests
+    public class IntegrationTests
     {
         [Theory]
         [InlineData(1)]
