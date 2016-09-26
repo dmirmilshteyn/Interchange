@@ -365,6 +365,8 @@ namespace Interchange
 
                                     var packet = (Packet)e.UserToken;
 
+                                    connection.PacketTransmissionController.KeepAlive();
+
                                     handled = ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, packet, false);
                                 }
                                 break;
@@ -653,6 +655,7 @@ namespace Interchange
 
         internal void SendHeartbeatPacket(Connection<TTag> connection, ushort sequenceNumber) {
             var packet = RequestNewPacket();
+            packet.MarkPayloadRegion(0, SystemHeader.Size + HeartbeatHeader.Size);
 
             var systemHeader = new SystemHeader(MessageType.Heartbeat, 0);
             systemHeader.WriteTo(packet);

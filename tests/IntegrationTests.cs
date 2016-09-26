@@ -319,6 +319,27 @@ namespace Interchange.Tests
             }
         }
 
+        [Fact]
+        public async Task TestIdleConnectionKeptAliveByHearbeat() {
+            using (var server = new TestNode()) {
+                server.ListenAsync();
+
+                using (var client = new TestNode()) {
+                    await client.ConnectAsync();
+
+                    var result = await server.ReadState();
+                    Assert.Equal(result, TestNodeState.Connected);
+                    Assert.True(server.IsStatesQueueEmpty());
+
+                    // Wait 60 seconds doing nothing
+                    await Task.Delay(60000);
+
+                    Assert.Equal(ConnectionState.Connected, client.RemoteConnection.State);
+                    Assert.Equal(ConnectionState.Connected, server.RemoteConnection.State);
+                }
+            }
+        }
+
         // TODO: Add tests for handling duplicate packets
         // TODO: Add tests for handling out-of-order packets
     }

@@ -33,6 +33,10 @@ namespace Interchange
         }
 
         public void Initialize() {
+            KeepAlive();
+        }
+
+        public void KeepAlive() {
             lastConfirmedTransmitTime = DateTime.UtcNow;
         }
 
