@@ -101,19 +101,17 @@ namespace Interchange
                     if (packetTransmissionOrder.Count > 0) {
                         int position = packetTransmissionOrder.Peek();
 
-                        lock (packetTransmissionsLock) {
-                            var transmissionObject = packetTransmissions[position];
-                            if (transmissionObject.Acked) {
-                                packetTransmissionOrder.Dequeue();
-                            } else if (DateTime.UtcNow >= DateTime.FromBinary(transmissionObject.LastTransmissionTime).AddMilliseconds(transmissionObject.DetermineSendWaitPeriod())) {
-                                packetTransmissionOrder.Dequeue();
+                        var transmissionObject = packetTransmissions[position];
+                        if (transmissionObject.Acked) {
+                            packetTransmissionOrder.Dequeue();
+                        } else if (DateTime.UtcNow >= DateTime.FromBinary(transmissionObject.LastTransmissionTime).AddMilliseconds(transmissionObject.DetermineSendWaitPeriod())) {
+                            packetTransmissionOrder.Dequeue();
 
-                                node.PerformSend(transmissionObject.Connection.RemoteEndPoint, transmissionObject.Packet, transmissionObject.Connection);
+                            node.PerformSend(transmissionObject.Connection.RemoteEndPoint, transmissionObject.Packet, transmissionObject.Connection);
 
-                                RecordPacketTransmissionUnsafe(position, transmissionObject.SequenceNumber, transmissionObject.Connection, transmissionObject.Packet);
+                            RecordPacketTransmissionUnsafe(position, transmissionObject.SequenceNumber, transmissionObject.Connection, transmissionObject.Packet);
 
-                                packetTransmissionOrder.Enqueue(position);
-                            }
+                            packetTransmissionOrder.Enqueue(position);
                         }
                     } else if (packetTransmissionOrder.Count == 0) {
                         if (lastConfirmedTransmitTime != DateTime.MinValue && DateTime.UtcNow > lastConfirmedTransmitTime.AddMilliseconds(10000)) {
