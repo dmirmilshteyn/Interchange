@@ -360,13 +360,21 @@ namespace Interchange
 
                                     break;
                                 }
+                            case MessageType.Heartbeat: {
+                                    var header = HeartbeatHeader.FromSegment(segment);
+
+                                    var packet = (Packet)e.UserToken;
+
+                                    handled = ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, packet, false);
+                                }
+                                break;
                             case MessageType.FragmentedReliableData: {
                                     var header = FragmentedReliableDataHeader.FromSegment(segment);
 
                                     var packet = (Packet)e.UserToken;
                                     packet.MarkPayloadRegion(segment.Offset + SystemHeader.Size + FragmentedReliableDataHeader.Size, header.PayloadSize);
 
-                                    handled = ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, packet, header.TotalFragmentCount);
+                                    handled = ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, packet, true, header.TotalFragmentCount);
                                 }
                                 break;
                             case MessageType.ReliableData: {
@@ -375,7 +383,7 @@ namespace Interchange
                                     Packet packet = (Packet)e.UserToken;
                                     packet.MarkPayloadRegion(segment.Offset + SystemHeader.Size + ReliableDataHeader.Size, header.PayloadSize);
 
-                                    handled = ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, packet);
+                                    handled = ProcessIncomingReliableDataPacket(connection, header.SequenceNumber, packet, true);
                                 }
                                 break;
                         }
@@ -413,7 +421,7 @@ namespace Interchange
             }
         }
 
-        private bool ProcessIncomingReliableDataPacket(Connection<TTag> connection, ushort sequenceNumber, Packet packet, ushort totalFragmentCount = 0) {
+        private bool ProcessIncomingReliableDataPacket(Connection<TTag> connection, ushort sequenceNumber, Packet packet, bool publishMessage, ushort totalFragmentCount = 0) {
             bool handled = false;
 
             if (sequenceNumber == connection.AckNumber) {
@@ -421,14 +429,14 @@ namespace Interchange
 
                 SendAckPacket(connection);
 
-                ProcessReliableDataPacket(connection, packet, sequenceNumber, totalFragmentCount);
+                ProcessReliableDataPacket(connection, packet, sequenceNumber, totalFragmentCount, publishMessage);
 
                 foreach (var futurePacket in connection.ReleaseCachedPackets(sequenceNumber)) {
                     // Handle the future packet, but do not send another ack - the ack has already been sent
                     // Instead, only increment the ack number to indicate it was processed
                     connection.IncrementAckNumber();
 
-                    ProcessReliableDataPacket(connection, futurePacket.Packet, futurePacket.SequenceNumber, futurePacket.TotalFragmentCount);
+                    ProcessReliableDataPacket(connection, futurePacket.Packet, futurePacket.SequenceNumber, futurePacket.TotalFragmentCount, futurePacket.PublishMessage);
                 }
             } else if (sequenceNumber < connection.AckNumber) {
                 // This is an old, duplicate packet
@@ -437,7 +445,7 @@ namespace Interchange
                 SendAckPacket(connection, sequenceNumber);
             } else if (sequenceNumber > connection.AckNumber) {
                 // This is a future packet, cache it for now
-                connection.CachePacket(sequenceNumber, new CachedPacketInformation(packet, sequenceNumber, totalFragmentCount));
+                connection.CachePacket(sequenceNumber, new CachedPacketInformation(packet, sequenceNumber, totalFragmentCount, publishMessage));
 
                 // Ack that this packet was received, but don't increment the ack number just yet
                 SendAckPacket(connection, sequenceNumber);
@@ -449,7 +457,7 @@ namespace Interchange
             return handled;
         }
 
-        private void ProcessReliableDataPacket(Connection<TTag> connection, Packet packet, ushort sequenceNumber, int totalFragmentCount) {
+        private void ProcessReliableDataPacket(Connection<TTag> connection, Packet packet, ushort sequenceNumber, int totalFragmentCount, bool publishMessage) {
             // If there is only 1 fragment, it can be treated as a standalone packet
             if (totalFragmentCount > 1) {
                 if (connection.ActiveFragmentContainer != null) {
@@ -460,8 +468,11 @@ namespace Interchange
                 connection.ActiveFragmentContainer.StorePacketFragment(sequenceNumber, packet);
             } else {
                 if (connection.ActiveFragmentContainer == null) {
-                    bool result = ProcessIncomingMessageAction(connection, packet);
-                    if (!result) {
+                    bool handled = false;
+                    if (publishMessage) {
+                        handled = ProcessIncomingMessageAction(connection, packet);
+                    }
+                    if (!handled) {
                         // Dispose the packet if it has not been handled by user code
                         packet.Dispose();
                     }
@@ -478,8 +489,11 @@ namespace Interchange
 
                         fragmentContainer.Dispose();
 
-                        bool result = ProcessIncomingMessageAction(connection, fullPacket);
-                        if (!result) {
+                        bool handled = false;
+                        if (publishMessage) {
+                            handled = ProcessIncomingMessageAction(connection, packet);
+                        }
+                        if (!handled) {
                             // Dispose the packet if it has not been handled by user code
                             fullPacket.Dispose();
                         }
@@ -630,6 +644,18 @@ namespace Interchange
             reliableDataHeader.WriteTo(packet.BackingBuffer, SystemHeader.Size);
 
             BitUtility.Write(buffer, bufferOffset, packet.BackingBuffer, SystemHeader.Size + ReliableDataHeader.Size, length);
+
+            SendToSequenced(connection, sequenceNumber, packet);
+        }
+
+        internal void SendHeartbeatPacket(Connection<TTag> connection, ushort sequenceNumber) {
+            var packet = RequestNewPacket();
+
+            var systemHeader = new SystemHeader(MessageType.Heartbeat, 0);
+            systemHeader.WriteTo(packet);
+
+            var heartbeatHeader = new HeartbeatHeader(sequenceNumber);
+            heartbeatHeader.WriteTo(packet.BackingBuffer, SystemHeader.Size);
 
             SendToSequenced(connection, sequenceNumber, packet);
         }

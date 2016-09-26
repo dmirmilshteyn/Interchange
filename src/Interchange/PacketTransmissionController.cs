@@ -5,7 +5,7 @@ using System.Net;
 
 namespace Interchange
 {
-    public class PacketTransmissionController<TTag>
+    internal class PacketTransmissionController<TTag>
     {
         readonly int WindowSize;
 
@@ -20,6 +20,8 @@ namespace Interchange
         private object processRetransmissionsLock = new object();
         private object packetTransmissionsLock = new object();
 
+        DateTime lastConfirmedTransmitTime = DateTime.MinValue;
+
         public PacketTransmissionController(Connection<TTag> connection, Node<TTag> node) {
             this.WindowSize = 1024;
 
@@ -28,6 +30,10 @@ namespace Interchange
 
             packetTransmissions = new PacketTransmissionObject<TTag>[WindowSize];
             packetTransmissionOrder = new Queue<int>();
+        }
+
+        public void Initialize() {
+            lastConfirmedTransmitTime = DateTime.UtcNow;
         }
 
         public void RecordPacketTransmissionAndEnqueue(ushort sequenceNumber, Connection<TTag> connection, Packet packet) {
@@ -62,6 +68,8 @@ namespace Interchange
         public void RecordAck(Connection<TTag> connection, int ackNumber) {
             ushort position = CalculatePosition((ushort)ackNumber, connection);
 
+            lastConfirmedTransmitTime = DateTime.UtcNow;
+
             lock (packetTransmissionsLock) {
                 packetTransmissions[position].SendCount = 0;
 
@@ -80,23 +88,40 @@ namespace Interchange
 
         public void ProcessRetransmissions() {
             lock (processRetransmissionsLock) {
-                if (packetTransmissionOrder.Count > 0) {
-                    int position = packetTransmissionOrder.Peek();
+                if (connection.State != ConnectionState.Disconnected) {
+                    if (lastConfirmedTransmitTime != DateTime.MinValue && DateTime.UtcNow > lastConfirmedTransmitTime.AddMilliseconds(20000)) {
+                        connection.TriggerConnectionLost();
+                        return;
+                    }
 
-                    lock (packetTransmissionsLock) {
-                        var transmissionObject = packetTransmissions[position];
-                        if (transmissionObject.Acked) {
-                            packetTransmissionOrder.Dequeue();
-                        } else if (transmissionObject.SendCount > 5) {
-                            connection.TriggerConnectionLost();
-                        } else if (DateTime.UtcNow >= DateTime.FromBinary(transmissionObject.LastTransmissionTime).AddMilliseconds(transmissionObject.DetermineSendWaitPeriod())) {
-                            packetTransmissionOrder.Dequeue();
+                    if (packetTransmissionOrder.Count > 0) {
+                        int position = packetTransmissionOrder.Peek();
 
-                            node.PerformSend(transmissionObject.Connection.RemoteEndPoint, transmissionObject.Packet);
+                        lock (packetTransmissionsLock) {
+                            var transmissionObject = packetTransmissions[position];
+                            if (transmissionObject.Acked) {
+                                packetTransmissionOrder.Dequeue();
+                            } else if (DateTime.UtcNow >= DateTime.FromBinary(transmissionObject.LastTransmissionTime).AddMilliseconds(transmissionObject.DetermineSendWaitPeriod())) {
+                                packetTransmissionOrder.Dequeue();
 
-                            RecordPacketTransmissionUnsafe(position, transmissionObject.SequenceNumber, transmissionObject.Connection, transmissionObject.Packet);
+                                node.PerformSend(transmissionObject.Connection.RemoteEndPoint, transmissionObject.Packet);
 
-                            packetTransmissionOrder.Enqueue(position);
+                                RecordPacketTransmissionUnsafe(position, transmissionObject.SequenceNumber, transmissionObject.Connection, transmissionObject.Packet);
+
+                                packetTransmissionOrder.Enqueue(position);
+                            }
+                        }
+                    } else if (packetTransmissionOrder.Count == 0) {
+                        if (lastConfirmedTransmitTime != DateTime.MinValue && DateTime.UtcNow > lastConfirmedTransmitTime.AddMilliseconds(10000)) {
+                            // Reset the timeout to allow the heartbeat to be processed
+                            // Only one heartbeat will be active at a time, as this block is only entered when there are no pending packets
+                            lastConfirmedTransmitTime = DateTime.UtcNow;
+                            lock (connection) {
+                                var packetSequenceNumber = connection.SequenceNumber;
+                                connection.IncrementSequenceNumber();
+
+                                node.SendHeartbeatPacket(connection, packetSequenceNumber);
+                            }
                         }
                     }
                 }

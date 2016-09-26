@@ -12,6 +12,8 @@ namespace Interchange
         Close = 4,
 
         FragmentedReliableData = 127,
-        ReliableData = 128
+        ReliableData = 128,
+
+        Heartbeat = 200
     }
 }

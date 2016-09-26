@@ -275,7 +275,7 @@ namespace Interchange.Tests
         }
 
         [Fact]
-        public async Task TestDroppedConnection() {
+        public async Task TestDroppedConnectionWithIncomingData() {
             using (var server = new TestNode()) {
                 server.ListenAsync();
 
@@ -291,6 +291,27 @@ namespace Interchange.Tests
 
                 var payload = GenerateRandomBytes(100);
                 server.SendDataAsync(payload);
+
+                result = await server.ReadState();
+                Assert.Equal(result, TestNodeState.Disconnected);
+                Assert.True(server.IsStatesQueueEmpty());
+            }
+        }
+
+        [Fact]
+        public async Task TestDroppedConnectionWithHeartbeatAndNoIncomingData() {
+            using (var server = new TestNode()) {
+                server.ListenAsync();
+
+                var client = new TestNode();
+                await client.ConnectAsync();
+
+                var result = await server.ReadState();
+                Assert.Equal(result, TestNodeState.Connected);
+                Assert.True(server.IsStatesQueueEmpty());
+
+                // Dispose, not a clean disconnect
+                client.Dispose();
 
                 result = await server.ReadState();
                 Assert.Equal(result, TestNodeState.Disconnected);

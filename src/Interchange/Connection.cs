@@ -28,7 +28,7 @@ namespace Interchange
             get { return (ushort)ackNumber; }
         }
 
-        public PacketTransmissionController<TTag> PacketTransmissionController { get; private set; }
+        internal PacketTransmissionController<TTag> PacketTransmissionController { get; private set; }
 
         public TTag Tag { get; set; }
 
@@ -78,6 +78,8 @@ namespace Interchange
 
         public void InitializeAckNumber(ushort ackNumber) {
             this.ackNumber = ackNumber;
+
+            PacketTransmissionController.Initialize();
         }
 
         public void Update() {
