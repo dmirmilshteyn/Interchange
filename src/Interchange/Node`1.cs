@@ -516,6 +516,7 @@ namespace Interchange
 
         private void SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, Packet packet) {
             connection.PacketTransmissionController.RecordPacketTransmissionAndEnqueue(sequenceNumber, connection, packet);
+            connection.PacketTransmissionController.KeepAlive();
 
             PerformSend(connection.RemoteEndPoint, packet);
         }
