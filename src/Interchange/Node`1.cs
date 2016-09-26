@@ -465,7 +465,7 @@ namespace Interchange
                 }
 
                 connection.ActiveFragmentContainer = new PacketFragmentContainer(sequenceNumber, totalFragmentCount);
-                connection.ActiveFragmentContainer.StorePacketFragment(sequenceNumber, packet);
+                connection.ActiveFragmentContainer.AddPacketFragment(packet);
             } else {
                 if (connection.ActiveFragmentContainer == null) {
                     bool handled = false;
@@ -477,25 +477,28 @@ namespace Interchange
                         packet.Dispose();
                     }
                 } else {
-                    var packetComplete = connection.ActiveFragmentContainer.StorePacketFragment(sequenceNumber, packet);
+                    // Only include fragments that can be published
+                    if (publishMessage) {
+                        var packetComplete = connection.ActiveFragmentContainer.AddPacketFragment(packet);
 
-                    if (packetComplete) {
-                        var fragmentContainer = connection.ActiveFragmentContainer;
-                        connection.ActiveFragmentContainer = null;
+                        if (packetComplete) {
+                            var fragmentContainer = connection.ActiveFragmentContainer;
+                            connection.ActiveFragmentContainer = null;
 
-                        var fullPacket = new Packet(null, new byte[fragmentContainer.PacketLength]);
-                        int bytesCopied = fragmentContainer.CopyInto(fullPacket.BackingBuffer);
-                        fullPacket.MarkPayloadRegion(0, bytesCopied);
+                            var fullPacket = new Packet(null, new byte[fragmentContainer.PacketLength]);
+                            int bytesCopied = fragmentContainer.CopyInto(fullPacket.BackingBuffer);
+                            fullPacket.MarkPayloadRegion(0, bytesCopied);
 
-                        fragmentContainer.Dispose();
+                            fragmentContainer.Dispose();
 
-                        bool handled = false;
-                        if (publishMessage) {
-                            handled = ProcessIncomingMessageAction(connection, packet);
-                        }
-                        if (!handled) {
-                            // Dispose the packet if it has not been handled by user code
-                            fullPacket.Dispose();
+                            bool handled = false;
+                            if (publishMessage) {
+                                handled = ProcessIncomingMessageAction(connection, fullPacket);
+                            }
+                            if (!handled) {
+                                // Dispose the packet if it has not been handled by user code
+                                fullPacket.Dispose();
+                            }
                         }
                     }
                 }

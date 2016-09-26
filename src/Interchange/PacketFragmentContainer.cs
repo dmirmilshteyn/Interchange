@@ -6,14 +6,14 @@ namespace Interchange
 {
     public class PacketFragmentContainer : IDisposable
     {
-        Packet[] packetFragments;
+        List<Packet> packetFragments;
 
         object fragmentLockObject = new object();
 
         public int PacketLength {
             get {
                 int size = 0;
-                for (int i = 0; i < packetFragments.Length; i++) {
+                for (int i = 0; i < packetFragments.Count; i++) {
                     size += packetFragments[i].Payload.Count;
                 }
                 return size;
@@ -21,21 +21,17 @@ namespace Interchange
         }
 
         public ushort InitialSequenceNumber { get; private set; }
-
-        public ushort LastSequenceNumber {
-            get { return (ushort)(InitialSequenceNumber + packetFragments.Length); }
-        }
+        public int TotalFragmentCount { get; }
 
         public PacketFragmentContainer(ushort initialSequenceNumber, int totalFragmentCount) {
             this.InitialSequenceNumber = initialSequenceNumber;
-            packetFragments = new Packet[totalFragmentCount];
+            packetFragments = new List<Packet>(totalFragmentCount);
+            this.TotalFragmentCount = totalFragmentCount;
         }
 
-        public bool StorePacketFragment(ushort fragmentSequenceNumber, Packet packet) {
+        public bool AddPacketFragment(Packet packet) {
             lock (fragmentLockObject) {
-                int fragmentNumber = fragmentSequenceNumber - InitialSequenceNumber;
-
-                packetFragments[fragmentNumber] = packet;
+                packetFragments.Add(packet);
 
                 return IsPacketComplete();
             }
@@ -43,7 +39,7 @@ namespace Interchange
 
         public int CopyInto(byte[] buffer) {
             int bufferOffset = 0;
-            for (int i = 0; i < packetFragments.Length; i++) {
+            for (int i = 0; i < packetFragments.Count; i++) {
                 Buffer.BlockCopy(packetFragments[i].BackingBuffer, packetFragments[i].Payload.Offset, buffer, bufferOffset, packetFragments[i].Payload.Count);
 
                 bufferOffset += packetFragments[i].Payload.Count;
@@ -53,17 +49,11 @@ namespace Interchange
         }
 
         private bool IsPacketComplete() {
-            for (int i = 0; i < packetFragments.Length; i++) {
-                if (packetFragments[i] == null) {
-                    return false;
-                }
-            }
-
-            return true;
+            return (TotalFragmentCount == packetFragments.Count);
         }
 
         public void Dispose() {
-            for (int i = 0; i < packetFragments.Length; i++) {
+            for (int i = 0; i < packetFragments.Count; i++) {
                 if (packetFragments[i] != null) {
                     packetFragments[i].Dispose();
                 }
