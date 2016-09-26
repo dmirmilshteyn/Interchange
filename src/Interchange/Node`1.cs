@@ -207,8 +207,15 @@ namespace Interchange
             RemoveConnection((Connection<TTag>)sender);
         }
 
-        internal void PerformSend(EndPoint endPoint, Packet packet) {
+        internal void PerformSend(EndPoint endPoint, Packet packet, Connection<TTag> connection = null) {
             try {
+                if (connection != null) {
+                    // Ensure the connection is connected before sending, if a connection is specified
+                    if (connection.State != ConnectionState.Connected && connection.State != ConnectionState.Disconnecting) {
+                        return;
+                    }
+                }
+
                 var eventArgs = socketEventArgsPool.GetObject();
                 eventArgs.RemoteEndPoint = endPoint;
                 eventArgs.SetBuffer(packet.BackingBuffer, packet.Payload.Offset, packet.Payload.Count);
@@ -318,10 +325,10 @@ namespace Interchange
 
                                     connection.InitializeAckNumber(header.SequenceNumber);
 
-                                    // Syn-ack received, confirm and establish the connection
-                                    SendAckPacket(connection);
-
                                     connection.State = ConnectionState.Connected;
+
+                                    // Syn-ack received, confirm and establish the connection
+                                    SendAckPacket(connection, true);
 
                                     ProcessConnectionAccepted(connection);
 
@@ -347,7 +354,7 @@ namespace Interchange
                                 }
                             case MessageType.Close: {
                                     var header = CloseHeader.FromSegment(segment);
-                                    SendAckPacket(connection, header.SequenceNumber);
+                                    SendAckPacket(connection, header.SequenceNumber, false);
 
                                     if (connection.State == ConnectionState.Connected) {
                                         // This is the receiver - a close request packet is received from the initiator
@@ -429,7 +436,7 @@ namespace Interchange
             if (sequenceNumber == connection.AckNumber) {
                 handled = true;
 
-                SendAckPacket(connection);
+                SendAckPacket(connection, true);
 
                 ProcessReliableDataPacket(connection, packet, sequenceNumber, totalFragmentCount, publishMessage);
 
@@ -444,13 +451,13 @@ namespace Interchange
                 // This is an old, duplicate packet
 
                 // Send the ack, then do nothing else, it has already been handled - drop it
-                SendAckPacket(connection, sequenceNumber);
+                SendAckPacket(connection, sequenceNumber, true);
             } else if (sequenceNumber > connection.AckNumber) {
                 // This is a future packet, cache it for now
                 connection.CachePacket(sequenceNumber, new CachedPacketInformation(packet, sequenceNumber, totalFragmentCount, publishMessage));
 
                 // Ack that this packet was received, but don't increment the ack number just yet
-                SendAckPacket(connection, sequenceNumber);
+                SendAckPacket(connection, sequenceNumber, true);
 
                 // Prevent the packet from being disposed immediately
                 handled = true;
@@ -514,11 +521,15 @@ namespace Interchange
             }
         }
 
-        private void SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, Packet packet) {
+        private void SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, Packet packet, bool ensureConnected) {
             connection.PacketTransmissionController.RecordPacketTransmissionAndEnqueue(sequenceNumber, connection, packet);
             connection.PacketTransmissionController.KeepAlive();
 
-            PerformSend(connection.RemoteEndPoint, packet);
+            if (ensureConnected) {
+                PerformSend(connection.RemoteEndPoint, packet, connection);
+            } else {
+                PerformSend(connection.RemoteEndPoint, packet);
+            }
         }
 
         private void SendInternalPacket(Connection<TTag> connection, MessageType messageType) {
@@ -558,14 +569,14 @@ namespace Interchange
             }
         }
 
-        private void SendAckPacket(Connection<TTag> connection) {
+        private void SendAckPacket(Connection<TTag> connection, bool ensureConnected) {
             lock (connection) {
-                SendAckPacket(connection, connection.AckNumber);
+                SendAckPacket(connection, connection.AckNumber, ensureConnected);
                 connection.IncrementAckNumber();
             }
         }
 
-        private void SendAckPacket(Connection<TTag> connection, ushort ackNumber) {
+        private void SendAckPacket(Connection<TTag> connection, ushort ackNumber, bool ensureConnected) {
             var packet = RequestNewPacket();
             packet.MarkPayloadRegion(0, SystemHeader.Size + 2);
 
@@ -574,7 +585,11 @@ namespace Interchange
 
             BitUtility.Write(ackNumber, packet.BackingBuffer, SystemHeader.Size);
 
-            PerformSend(connection.RemoteEndPoint, packet);
+            if (ensureConnected) {
+                PerformSend(connection.RemoteEndPoint, packet, connection);
+            } else {
+                PerformSend(connection.RemoteEndPoint, packet);
+            }
         }
 
         private void SendReliableDataPacket(Connection<TTag> connection, byte[] buffer) {
@@ -625,18 +640,18 @@ namespace Interchange
         }
 
         private void SendFragmentedReliableDataPacket(Connection<TTag> connection, byte[] buffer, int bufferOffset, int length, ushort sequenceNumber, ushort totalFragmentCount) {
-                var packet = RequestNewPacket();
-                packet.MarkPayloadRegion(0, SystemHeader.Size + FragmentedReliableDataHeader.Size + length);
+            var packet = RequestNewPacket();
+            packet.MarkPayloadRegion(0, SystemHeader.Size + FragmentedReliableDataHeader.Size + length);
 
-                var systemHeader = new SystemHeader(MessageType.FragmentedReliableData, 0);
-                systemHeader.WriteTo(packet);
+            var systemHeader = new SystemHeader(MessageType.FragmentedReliableData, 0);
+            systemHeader.WriteTo(packet);
 
-                var fragmentedReliableDataHeader = new FragmentedReliableDataHeader(sequenceNumber, (ushort)length, totalFragmentCount);
-                fragmentedReliableDataHeader.WriteTo(packet.BackingBuffer, SystemHeader.Size);
+            var fragmentedReliableDataHeader = new FragmentedReliableDataHeader(sequenceNumber, (ushort)length, totalFragmentCount);
+            fragmentedReliableDataHeader.WriteTo(packet.BackingBuffer, SystemHeader.Size);
 
-                BitUtility.Write(buffer, bufferOffset, packet.BackingBuffer, SystemHeader.Size + FragmentedReliableDataHeader.Size, length);
+            BitUtility.Write(buffer, bufferOffset, packet.BackingBuffer, SystemHeader.Size + FragmentedReliableDataHeader.Size, length);
 
-                SendToSequenced(connection, sequenceNumber, packet);
+            SendToSequenced(connection, sequenceNumber, packet, true);
         }
 
         private void SendReliableDataPacket(Connection<TTag> connection, byte[] buffer, int bufferOffset, int length, ushort sequenceNumber) {
@@ -651,7 +666,7 @@ namespace Interchange
 
             BitUtility.Write(buffer, bufferOffset, packet.BackingBuffer, SystemHeader.Size + ReliableDataHeader.Size, length);
 
-            SendToSequenced(connection, sequenceNumber, packet);
+            SendToSequenced(connection, sequenceNumber, packet, true);
         }
 
         internal void SendHeartbeatPacket(Connection<TTag> connection, ushort sequenceNumber) {
@@ -664,7 +679,7 @@ namespace Interchange
             var heartbeatHeader = new HeartbeatHeader(sequenceNumber);
             heartbeatHeader.WriteTo(packet.BackingBuffer, SystemHeader.Size);
 
-            SendToSequenced(connection, sequenceNumber, packet);
+            SendToSequenced(connection, sequenceNumber, packet, true);
         }
 
         private ushort SendClosePacket(Connection<TTag> connection) {
@@ -680,7 +695,7 @@ namespace Interchange
 
                 BitUtility.Write(sequenceNumber, packet.BackingBuffer, SystemHeader.Size);
 
-                SendToSequenced(connection, sequenceNumber, packet);
+                SendToSequenced(connection, sequenceNumber, packet, false);
 
                 return sequenceNumber;
             }

@@ -108,7 +108,7 @@ namespace Interchange
                             } else if (DateTime.UtcNow >= DateTime.FromBinary(transmissionObject.LastTransmissionTime).AddMilliseconds(transmissionObject.DetermineSendWaitPeriod())) {
                                 packetTransmissionOrder.Dequeue();
 
-                                node.PerformSend(transmissionObject.Connection.RemoteEndPoint, transmissionObject.Packet);
+                                node.PerformSend(transmissionObject.Connection.RemoteEndPoint, transmissionObject.Packet, transmissionObject.Connection);
 
                                 RecordPacketTransmissionUnsafe(position, transmissionObject.SequenceNumber, transmissionObject.Connection, transmissionObject.Packet);
 
