@@ -436,7 +436,7 @@ namespace Interchange
             if (sequenceNumber == connection.AckNumber) {
                 handled = true;
 
-                SendAckPacket(connection, true);
+                SendAckPacketUnsafe(connection, true);
 
                 ProcessReliableDataPacket(connection, packet, sequenceNumber, totalFragmentCount, publishMessage);
 
@@ -571,9 +571,13 @@ namespace Interchange
 
         private void SendAckPacket(Connection<TTag> connection, bool ensureConnected) {
             lock (connection) {
-                SendAckPacket(connection, connection.AckNumber, ensureConnected);
-                connection.IncrementAckNumber();
+                SendAckPacketUnsafe(connection, ensureConnected);
             }
+        }
+
+        private void SendAckPacketUnsafe(Connection<TTag> connection, bool ensureConnected) {
+            SendAckPacket(connection, connection.AckNumber, ensureConnected);
+            connection.IncrementAckNumber();
         }
 
         private void SendAckPacket(Connection<TTag> connection, ushort ackNumber, bool ensureConnected) {
