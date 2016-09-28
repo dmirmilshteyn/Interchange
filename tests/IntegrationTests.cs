@@ -354,8 +354,20 @@ namespace Interchange.Tests
             }
         }
 
-        [Fact]
-        public async Task TestOutOfOrderPackets() {
+        public static IEnumerable<object[]> SequenceOrders {
+            get {
+                yield return new object[] {
+                    new ushort[10] { 3, 5, 1, 0, 6, 2, 4, 9, 7, 8 }
+                };
+                yield return new object[] {
+                    new ushort[10] { 9, 7, 4, 2, 1, 3, 6, 5, 8, 0 }
+                };
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(SequenceOrders))]
+        public async Task TestOutOfOrderPackets(ushort[] sequenceNumbers) {
             using (var server = new TestNode()) {
                 server.ListenAsync();
 
@@ -365,7 +377,6 @@ namespace Interchange.Tests
                     var payload = GenerateRandomBytes(200);
 
                     var startingSequenceNumber = client.RemoteConnection.SequenceNumber;
-                    var sequenceNumbers = new ushort[10] { 3, 5, 1, 0, 6, 2, 4, 9, 7, 8 };
 
                     for (int i = 0; i < sequenceNumbers.Length; i++) {
                         var packet = client.BuildReliableDataPacket(payload, 0, payload.Length, (ushort)(startingSequenceNumber + sequenceNumbers[i]));
