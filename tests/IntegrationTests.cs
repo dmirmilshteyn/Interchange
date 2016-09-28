@@ -394,6 +394,39 @@ namespace Interchange.Tests
             }
         }
 
+        [Fact]
+        public async Task TestHandlingDuplicatePackets() {
+            using (var server = new TestNode()) {
+                server.ListenAsync();
+
+                using (var client = new TestNode()) {
+                    await client.ConnectAsync();
+
+                    var payload = GenerateRandomBytes(200);
+
+                    var startingSequenceNumber = client.RemoteConnection.SequenceNumber;
+
+                    for (int i = 0; i < 10; i++) {
+                        var packet = client.BuildReliableDataPacket(payload, 0, payload.Length, (ushort)(startingSequenceNumber + i));
+
+                        var sendSequenceNumber = (ushort)client.RemoteConnection.IncrementSequenceNumber();
+
+                        // Send duplicates
+                        client.SendToSequenced(client.RemoteConnection, sendSequenceNumber, packet, true);
+                        client.SendToSequenced(client.RemoteConnection, sendSequenceNumber, packet, true);
+                        client.SendToSequenced(client.RemoteConnection, sendSequenceNumber, packet, true);
+                    }
+
+                    for (int i = 0; i < 10; i++) {
+                        using (var result = await server.ReadMessage()) {
+                            Assert.True(result.Payload.SequenceEqual(payload));
+                        }
+                    }
+                }
+            }
+        }
+        
+
         [Theory(Skip = "Congestion/flow control not yet implemented")]
         [MemberData(nameof(MessageTestPayloads))]
         public async Task SendSpamTest(byte[][] payloads, int latency, int dropPercentage) {
@@ -414,7 +447,5 @@ namespace Interchange.Tests
                 }
             }
         }
-
-        // TODO: Add tests for handling duplicate packets
     }
 }
