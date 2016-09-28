@@ -8,12 +8,20 @@ using System.Threading.Tasks;
 
 namespace Interchange
 {
-    public class Connection<TTag>
+    public class Connection<TTag> : ObservableObject
     {
         internal TaskCompletionSource<bool> DisconnectTcs { get; set; }
         internal ushort DisconnectSequenceNumber { get; set; }
 
-        public ConnectionState State { get; internal set; }
+        ConnectionState state;
+        public ConnectionState State {
+            get { return state; }
+            set {
+                state = value;
+                RaisePropertyChanged();
+            }
+        }
+
         public EndPoint RemoteEndPoint { get; private set; }
 
         int sequenceNumber;
