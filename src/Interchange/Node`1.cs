@@ -521,7 +521,11 @@ namespace Interchange
             }
         }
 
+#if TEST
+        public void SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, Packet packet, bool ensureConnected) {
+#else
         private void SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, Packet packet, bool ensureConnected) {
+#endif
             connection.PacketTransmissionController.RecordPacketTransmissionAndEnqueue(sequenceNumber, connection, packet);
             connection.PacketTransmissionController.KeepAlive();
 
@@ -657,6 +661,23 @@ namespace Interchange
 
             SendToSequenced(connection, sequenceNumber, packet, true);
         }
+
+#if TEST
+        public Packet BuildReliableDataPacket(byte[] buffer, int bufferOffset, int length, ushort sequenceNumber) {
+            var packet = RequestNewPacket();
+            packet.MarkPayloadRegion(0, SystemHeader.Size + ReliableDataHeader.Size + length);
+
+            var systemHeader = new SystemHeader(MessageType.ReliableData, 0);
+            systemHeader.WriteTo(packet);
+
+            var reliableDataHeader = new ReliableDataHeader(sequenceNumber, (ushort)length);
+            reliableDataHeader.WriteTo(packet.BackingBuffer, SystemHeader.Size);
+
+            BitUtility.Write(buffer, bufferOffset, packet.BackingBuffer, SystemHeader.Size + ReliableDataHeader.Size, length);
+
+            return packet;
+        }
+#endif
 
         private void SendReliableDataPacket(Connection<TTag> connection, byte[] buffer, int bufferOffset, int length, ushort sequenceNumber) {
             var packet = RequestNewPacket();

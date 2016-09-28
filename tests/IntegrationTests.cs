@@ -354,6 +354,35 @@ namespace Interchange.Tests
             }
         }
 
+        [Fact]
+        public async Task TestOutOfOrderPackets() {
+            using (var server = new TestNode()) {
+                server.ListenAsync();
+
+                using (var client = new TestNode()) {
+                    await client.ConnectAsync();
+
+                    var payload = GenerateRandomBytes(200);
+
+                    var startingSequenceNumber = client.RemoteConnection.SequenceNumber;
+                    var sequenceNumbers = new ushort[10] { 3, 5, 1, 0, 6, 2, 4, 9, 7, 8 };
+
+                    for (int i = 0; i < sequenceNumbers.Length; i++) {
+                        var packet = client.BuildReliableDataPacket(payload, 0, payload.Length, (ushort)(startingSequenceNumber + sequenceNumbers[i]));
+
+                        var sendSequenceNumber = (ushort)client.RemoteConnection.IncrementSequenceNumber();
+                        client.SendToSequenced(client.RemoteConnection, sendSequenceNumber, packet, true);
+                    }
+
+                    for (int i = 0; i < sequenceNumbers.Length; i++) {
+                        using (var result = await server.ReadMessage()) {
+                            Assert.True(result.Payload.SequenceEqual(payload));
+                        }
+                    }
+                }
+            }
+        }
+
         [Theory(Skip = "Congestion/flow control not yet implemented")]
         [MemberData(nameof(MessageTestPayloads))]
         public async Task SendSpamTest(byte[][] payloads, int latency, int dropPercentage) {
@@ -376,6 +405,5 @@ namespace Interchange.Tests
         }
 
         // TODO: Add tests for handling duplicate packets
-        // TODO: Add tests for handling out-of-order packets
     }
 }

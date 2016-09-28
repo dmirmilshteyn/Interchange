@@ -36,7 +36,10 @@ namespace Interchange
 
         internal event EventHandler ConnectionLost;
 
-        ConcurrentDictionary<ushort, CachedPacketInformation> packetCache;
+
+        Dictionary<ushort, CachedPacketInformation> packetCache;
+        object packetCacheLockObject = new object();
+
         internal PacketFragmentContainer ActiveFragmentContainer { get; set; }
 
         public Connection(Node<TTag> node, EndPoint remoteEndPoint) {
@@ -47,29 +50,42 @@ namespace Interchange
             this.sequenceNumber = InitialSequenceNumber = 0;//random.Next(ushort.MaxValue, ushort.MaxValue + 1);
 
             PacketTransmissionController = new PacketTransmissionController<TTag>(this, node);
-            packetCache = new ConcurrentDictionary<ushort, CachedPacketInformation>();
+            packetCache = new Dictionary<ushort, CachedPacketInformation>();
         }
 
-        internal void CachePacket(ushort sequenceNumber, CachedPacketInformation packetInformation) {
-            packetCache.TryAdd(sequenceNumber, packetInformation);
-        }
-
-        internal IEnumerable<CachedPacketInformation> ReleaseCachedPackets(ushort currentSequenceNumber) {
-            // Check if the next packet is in the cache
-            currentSequenceNumber++;
-            while (packetCache.Count > 0) {
-                CachedPacketInformation packetInformation;
-                if (packetCache.TryRemove(currentSequenceNumber, out packetInformation)) {
-                    yield return packetInformation;
-                    // Try the next packet
+        internal bool CachePacket(ushort sequenceNumber, CachedPacketInformation packetInformation) {
+            lock (packetCacheLockObject) {
+                if (!packetCache.ContainsKey(sequenceNumber)) {
+                    packetCache.Add(sequenceNumber, packetInformation);
+                    return true;
                 } else {
-                    break;
+                    return false;
                 }
             }
         }
 
-        public void IncrementSequenceNumber() {
+        internal IEnumerable<CachedPacketInformation> ReleaseCachedPackets(ushort currentSequenceNumber) {
+            lock (packetCacheLockObject) {
+                // Check if the next packet is in the cache
+                currentSequenceNumber++;
+                while (packetCache.Count > 0) {
+                    CachedPacketInformation packetInformation;
+                    if (packetCache.TryGetValue(currentSequenceNumber, out packetInformation)) {
+                        packetCache.Remove(currentSequenceNumber);
+                        yield return packetInformation;
+                        // Try the next packet
+                        currentSequenceNumber++;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+
+        public int IncrementSequenceNumber() {
+            var currentSequenceNumber = sequenceNumber;
             Interlocked.Increment(ref sequenceNumber);
+            return sequenceNumber;
         }
 
         public void IncrementAckNumber() {

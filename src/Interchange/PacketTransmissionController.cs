@@ -81,7 +81,7 @@ namespace Interchange
                     packetTransmissions[position].Acked = true;
 
                     // Only dispose the packet once it has been confirmed that the other side received it
-                    packetTransmissions[position].Packet.Dispose();
+                    packetTransmissions[position].Packet?.Dispose();
 
                     // Got ack
                 } else {
