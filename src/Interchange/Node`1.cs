@@ -32,7 +32,8 @@ namespace Interchange
             get { return socketEventArgsPool; }
         }
 
-        ConcurrentDictionary<EndPoint, Connection<TTag>> connections;
+        object connectionsLockObject = new object();
+        Dictionary<EndPoint, Connection<TTag>> connections;
         NodeConfiguration configuration;
 
         TaskCompletionSource<bool> connectTcs;
@@ -45,18 +46,22 @@ namespace Interchange
 
         public Connection<TTag> RemoteConnection {
             get {
-                if (connections.Count > 0) {
-                    return connections.First().Value;
-                } else {
-                    return null;
+                lock (connectionsLockObject) {
+                    if (connections.Count > 0) {
+                        return connections.First().Value;
+                    } else {
+                        return null;
+                    }
                 }
             }
         }
 
         public IEnumerable<Connection<TTag>> Connections {
             get {
-                foreach (var connection in connections) {
-                    yield return connection.Value;
+                lock (connectionsLockObject) {
+                    foreach (var connection in connections) {
+                        yield return connection.Value;
+                    }
                 }
             }
         }
@@ -88,7 +93,7 @@ namespace Interchange
                 return eventArgs;
             }, configuration.SocketEventPoolSize);
 
-            connections = new ConcurrentDictionary<EndPoint, Connection<TTag>>();
+            connections = new Dictionary<EndPoint, Connection<TTag>>();
 
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
 
@@ -103,8 +108,12 @@ namespace Interchange
         }
 
         private void Update(object stateObject) {
-            foreach (var connection in connections) {
-                connection.Value.Update();
+            Connection<TTag>[] connectionsCopy;
+            lock (connectionsLockObject) {
+                connectionsCopy = connections.Values.ToArray();
+            }
+            foreach (var connection in connectionsCopy) {
+                connection.Update();
             }
         }
 
@@ -170,7 +179,12 @@ namespace Interchange
         }
 
         public async Task DisconnectAsync() {
-            foreach (var connection in Connections) {
+            Connection<TTag>[] connectionsCopy;
+            lock (connectionsLockObject) {
+                connectionsCopy = connections.Values.ToArray();
+            }
+
+            foreach (var connection in connectionsCopy) {
                 await DisconnectAsync(connection);
             }
         }
@@ -184,21 +198,24 @@ namespace Interchange
         }
 
         private bool TryAddConnection(EndPoint endPoint, Connection<TTag> connection) {
-            if (connections.TryAdd(endPoint, connection)) {
-                BindEvents(connection);
+            lock (connectionsLockObject) {
+                if (!connections.ContainsKey(endPoint)) {
+                    connections.Add(endPoint, connection);
+                    BindEvents(connection);
 
-                return true;
+                    return true;
+                }
+
+                return false;
             }
-
-            return false;
         }
 
         private void RemoveConnection(Connection<TTag> connection) {
             UnbindEvents(connection);
 
-            // TODO: Timeout here to prevent deadlocks
-            Connection<TTag> temp;
-            while (!connections.TryRemove(connection.RemoteEndPoint, out temp)) { }
+            lock (connectionsLockObject) {
+                connections.Remove(connection.RemoteEndPoint);
+            }
 
             ProcessConnectionDisconnected(connection);
         }
