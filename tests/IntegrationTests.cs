@@ -169,6 +169,20 @@ namespace Interchange.Tests
             }
         }
 
+        private void SendPayloadsWithoutWaiting(TestNode client, byte[][] payloads) {
+            for (int i = 0; i < payloads.Length; i++) {
+                client.SendDataAsync(payloads[i]);
+            }
+        }
+
+        private async Task VerifySentPayloads(TestNode server, byte[][] payloads) {
+            for (int i = 0; i < payloads.Length; i++) {
+                using (var result = await server.ReadMessage()) {
+                    Assert.True(result.Payload.SequenceEqual(payloads[i]));
+                }
+            }
+        }
+
         private byte[] GenerateRandomBytes(int length) {
             var buffer = new byte[length];
             var rand = new Random();
@@ -336,6 +350,27 @@ namespace Interchange.Tests
 
                     Assert.Equal(ConnectionState.Connected, client.RemoteConnection.State);
                     Assert.Equal(ConnectionState.Connected, server.RemoteConnection.State);
+                }
+            }
+        }
+
+        [Theory(Skip = "Congestion/flow control not yet implemented")]
+        [MemberData(nameof(MessageTestPayloads))]
+        public async Task SendSpamTest(byte[][] payloads, int latency, int dropPercentage) {
+            using (var server = new TestNode()) {
+                using (var client = new TestNode(new TestSettings(latency, dropPercentage))) {
+                    server.ListenAsync();
+                    await client.ConnectAsync();
+
+                    for (int i = 0; i < 100000; i++) {
+                        SendPayloadsWithoutWaiting(client, payloads);
+                    }
+
+                    for (int i = 0; i < 100000; i++) {
+                        await VerifySentPayloads(server, payloads);
+                    }
+
+                    await client.DisconnectAsync();
                 }
             }
         }
