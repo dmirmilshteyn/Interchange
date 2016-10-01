@@ -48,6 +48,8 @@ namespace Interchange
         Dictionary<ushort, CachedPacketInformation> packetCache;
         object packetCacheLockObject = new object();
 
+        internal object incomingDataLock = new object();
+
         internal PacketFragmentContainer ActiveFragmentContainer { get; set; }
 
         public Connection(Node<TTag> node, EndPoint remoteEndPoint) {

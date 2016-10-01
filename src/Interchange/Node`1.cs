@@ -332,7 +332,7 @@ namespace Interchange
 
                 Connection<TTag> connection;
                 if (connections.TryGetValue(e.RemoteEndPoint, out connection)) {
-                    lock (connection) {
+                    lock (connection.incomingDataLock) {
                         switch (systemHeader.MessageType) {
                             case MessageType.Syn:
                                 // TODO: Reject the connection, already connected!
