@@ -7,6 +7,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{B4C9D343-A74
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{5A1DCF02-358C-4460-B712-F402F199525C}"
 	ProjectSection(SolutionItems) = preProject
+		.travis.yml = .travis.yml
 		NuGet.Config = NuGet.Config
 	EndProjectSection
 EndProject

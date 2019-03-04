@@ -1,19 +1,22 @@
 language: csharp
 
-sudo: required
-dist: trusty
+dotnet: 2.1.502
+mono: latest
 
-mono: beta
-dotnet: 1.0.0-preview2-003121
-
-script:
- - build_num=$TRAVIS_BUILD_NUMBER
- - build_num=$(printf "%.4d" "$build_num")
- - export DOTNET_BUILD_VERSION=$build_num
- - dotnet restore
- - cd tests
- - dotnet test -c Test
- - cd ../src/Interchange
- - dotnet pack --configuration Release
- - cd bin/Release
- - nuget push *.nupkg -ApiKey "$API_KEY" -Source "$FEED_URL"
+jobs:
+  include:
+    - stage: build
+      script:
+        - build_num=$TRAVIS_BUILD_NUMBER
+        - build_num=$(printf "%.4d" "$build_num")
+        - export DOTNET_BUILD_VERSION=$build_num
+        - dotnet restore
+        - cd tests
+        - dotnet test
+    - stage: deploy 
+      if: branch = master
+      script:
+        - cd ../src/Interchange
+        - dotnet pack --configuration Release
+        - cd bin/Release
+        - nuget push *.nupkg -ApiKey "$API_KEY" -Source "$FEED_URL"
