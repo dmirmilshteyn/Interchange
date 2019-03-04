@@ -25,14 +25,16 @@ namespace Interchange.Tests
             nodeStateQueue = new Queue<TestNodeState>();
         }
 
-        public TestNode(TestSettings testSettings) : base(testSettings) {
+        public TestNode(SimulationSettings simulationSettings) {
+            this.SimulationSettings = simulationSettings;
+
             packetQueue = new Queue<Packet>();
             nodeStateQueue = new Queue<TestNodeState>();
         }
 
         protected override bool ProcessIncomingMessageAction(Connection<object> connection, Packet packet) {
             packetQueueSemaphore.Wait();
-            this.packetQueue.Enqueue(packet);
+            packetQueue.Enqueue(packet);
             packetQueueSemaphore.Release();
 
             bufferSemaphore.Release();

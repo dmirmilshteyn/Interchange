@@ -1,12 +1,10 @@
-﻿#if TEST
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace Interchange
 {
-    public class TestSettings
+    public class SimulationSettings
     {
         int packetDropValueCount = 0;
 
@@ -15,7 +13,7 @@ namespace Interchange
         public bool PacketDroppingEnabled { get; set; } = false;
         public int PacketDropPercentage { get; set; }
 
-        public TestSettings(int simulatedLatency, int packetDropPercentage) {
+        public SimulationSettings(int simulatedLatency, int packetDropPercentage) {
             this.SimulatedLatency = simulatedLatency;
             this.PacketDropPercentage = packetDropPercentage;
         }
@@ -41,5 +39,3 @@ namespace Interchange
         }
     }
 }
-
-#endif

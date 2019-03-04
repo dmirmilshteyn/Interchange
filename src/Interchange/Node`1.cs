@@ -13,9 +13,7 @@ namespace Interchange
 {
     public class Node<TTag> : IDisposable
     {
-#if TEST
-        public TestSettings TestSettings { get; }
-#endif
+        public SimulationSettings SimulationSettings { get; set; }
 
         private readonly EndPoint LocalEndPoint = new IPEndPoint(IPAddress.Any, 0);
 
@@ -66,12 +64,6 @@ namespace Interchange
             }
         }
 
-#if TEST
-        public Node(TestSettings testSettings) : this() {
-            this.TestSettings = testSettings;
-        }
-#endif
-
         public Node() : this(new NodeConfiguration()) {
         }
 
@@ -85,8 +77,7 @@ namespace Interchange
             packetPool = new ObjectPool<Packet>();
             packetPool.SeedPool(() => { return new Packet(packetPool, new byte[configuration.MTU]); }, configuration.BufferPoolSize);
 
-            socketEventArgsPool = new ObjectPool<SocketAsyncEventArgs>(() =>
-            {
+            socketEventArgsPool = new ObjectPool<SocketAsyncEventArgs>(() => {
                 var eventArgs = new SocketAsyncEventArgs();
                 eventArgs.Completed += IO_Completed;
 
@@ -270,38 +261,24 @@ namespace Interchange
             }
         }
 
-        private void HandleReceiveIOCompleted(SocketAsyncEventArgs e) {
-#if TEST
-            if (TestSettings != null) {
-                bool dropPacket = false;
-                if (TestSettings.PacketDroppingEnabled && TestSettings.PacketDropPercentage > 0) {
-                    if (TestSettings.GetNextPacketDropValue() <= TestSettings.PacketDropPercentage) {
+        private async void HandleReceiveIOCompleted(SocketAsyncEventArgs e) {
+            var dropPacket = false;
+
+            if (SimulationSettings != null) {
+                if (SimulationSettings.PacketDroppingEnabled && SimulationSettings.PacketDropPercentage > 0) {
+                    if (SimulationSettings.GetNextPacketDropValue() <= SimulationSettings.PacketDropPercentage) {
                         dropPacket = true;
                     }
                 }
 
-                if (!dropPacket) {
-                    if (TestSettings.SimulatedLatency > 0) {
-                        Task.Run(async () =>
-                        {
-                            await Task.Delay(TestSettings.SimulatedLatency).ConfigureAwait(false);
-                            HandlePacketReceived(e);
-
-                            PerformReceive();
-                            socketEventArgsPool.ReleaseObject(e);
-                        });
-
-                        return;
-                    } else {
-                        HandlePacketReceived(e);
-                    }
+                if (SimulationSettings.SimulatedLatency > 0) {
+                    await Task.Delay(SimulationSettings.SimulatedLatency).ConfigureAwait(false);
                 }
-            } else {
+            }
+
+            if (!dropPacket) {
                 HandlePacketReceived(e);
             }
-#else
-            HandlePacketReceived(e);
-#endif
 
             PerformReceive();
 
@@ -538,11 +515,7 @@ namespace Interchange
             }
         }
 
-#if TEST
-        public void SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, Packet packet, bool ensureConnected) {
-#else
-        private void SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, Packet packet, bool ensureConnected) {
-#endif
+        internal void SendToSequenced(Connection<TTag> connection, ushort sequenceNumber, Packet packet, bool ensureConnected) {
             connection.PacketTransmissionController.RecordPacketTransmissionAndEnqueue(sequenceNumber, connection, packet);
             connection.PacketTransmissionController.KeepAlive();
 
@@ -679,8 +652,7 @@ namespace Interchange
             SendToSequenced(connection, sequenceNumber, packet, true);
         }
 
-#if TEST
-        public Packet BuildReliableDataPacket(byte[] buffer, int bufferOffset, int length, ushort sequenceNumber) {
+        internal Packet BuildReliableDataPacket(byte[] buffer, int bufferOffset, int length, ushort sequenceNumber) {
             var packet = RequestNewPacket();
             packet.MarkPayloadRegion(0, SystemHeader.Size + ReliableDataHeader.Size + length);
 
@@ -694,7 +666,6 @@ namespace Interchange
 
             return packet;
         }
-#endif
 
         private void SendReliableDataPacket(Connection<TTag> connection, byte[] buffer, int bufferOffset, int length, ushort sequenceNumber) {
             var packet = RequestNewPacket();

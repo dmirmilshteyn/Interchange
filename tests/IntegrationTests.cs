@@ -27,7 +27,7 @@ namespace Interchange.Tests
                     clients.Add(client);
 
                     var result = await server.ReadState();
-                    Assert.Equal(result, TestNodeState.Connected);
+                    Assert.Equal(TestNodeState.Connected, result);
                     Assert.True(server.IsStatesQueueEmpty());
                 }
 
@@ -81,11 +81,11 @@ namespace Interchange.Tests
         [MemberData(nameof(MessageTestPayloads), new int[] { 0, 100, 300, 1000 }, new int[] { 0, 20, 40, 60, 80 })]
         public async Task SimpleMessageTest(byte[][] payloads, int latency, int dropPercentage) {
             using (var server = new TestNode()) {
-                using (var client = new TestNode(new TestSettings(latency, dropPercentage))) {
+                using (var client = new TestNode(new SimulationSettings(latency, dropPercentage))) {
                     server.ListenAsync();
                     await client.ConnectAsync();
 
-                    client.TestSettings.PacketDroppingEnabled = true;
+                    client.SimulationSettings.PacketDroppingEnabled = true;
 
                     await SendPayloads(server, client, payloads);
 
@@ -98,7 +98,7 @@ namespace Interchange.Tests
         [MemberData(nameof(MessageTestPayloads))]
         public async Task ManySimpleMessageTest(byte[][] payloads, int latency, int dropPercentage) {
             using (var server = new TestNode()) {
-                using (var client = new TestNode(new TestSettings(latency, dropPercentage))) {
+                using (var client = new TestNode(new SimulationSettings(latency, dropPercentage))) {
                     server.ListenAsync();
                     await client.ConnectAsync();
 
@@ -136,7 +136,7 @@ namespace Interchange.Tests
         [MemberData(nameof(MessageTestPayloads))]
         public async Task ManySimpleMessageTestWithoutWaiting(byte[][] payloads, int latency, int dropPercentage) {
             using (var server = new TestNode()) {
-                using (var client = new TestNode(new TestSettings(latency, dropPercentage))) {
+                using (var client = new TestNode(new SimulationSettings(latency, dropPercentage))) {
                     server.ListenAsync();
                     await client.ConnectAsync();
 
@@ -233,7 +233,7 @@ namespace Interchange.Tests
         [MemberData(nameof(MessageTestPayloads))]
         public async Task PoolSizeTest(byte[][] payloads, int latency, int dropPercentage) {
             using (var server = new TestNode()) {
-                using (var client = new TestNode(new TestSettings(latency, dropPercentage))) {
+                using (var client = new TestNode(new SimulationSettings(latency, dropPercentage))) {
                     int startingServerPacketPoolSize = server.PacketPool.Size;
                     int startingClientPacketPoolSize = client.PacketPool.Size;
                     int startingServerSocketPoolSize = server.SocketEventArgsPool.Size;
@@ -267,22 +267,22 @@ namespace Interchange.Tests
 
                     // Ensure both the client and server are connected
                     var result = await client.ReadState();
-                    Assert.Equal(result, TestNodeState.Connected);
+                    Assert.Equal(TestNodeState.Connected, result);
                     Assert.True(client.IsStatesQueueEmpty());
 
                     result = await server.ReadState();
-                    Assert.Equal(result, TestNodeState.Connected);
+                    Assert.Equal(TestNodeState.Connected, result);
                     Assert.True(server.IsStatesQueueEmpty());
 
                     await client.DisconnectAsync();
 
                     // Ensure both the client and server and disconnected
                     result = await client.ReadState();
-                    Assert.Equal(result, TestNodeState.Disconnected);
+                    Assert.Equal(TestNodeState.Disconnected, result);
                     Assert.True(client.IsStatesQueueEmpty());
 
                     result = await server.ReadState();
-                    Assert.Equal(result, TestNodeState.Disconnected);
+                    Assert.Equal(TestNodeState.Disconnected, result);
                     Assert.True(server.IsStatesQueueEmpty());
                 }
             }
@@ -297,7 +297,7 @@ namespace Interchange.Tests
                 await client.ConnectAsync();
 
                 var result = await server.ReadState();
-                Assert.Equal(result, TestNodeState.Connected);
+                Assert.Equal(TestNodeState.Connected, result);
                 Assert.True(server.IsStatesQueueEmpty());
 
                 // Dispose, not a clean disconnect
@@ -307,7 +307,7 @@ namespace Interchange.Tests
                 server.SendDataAsync(payload);
 
                 result = await server.ReadState();
-                Assert.Equal(result, TestNodeState.Disconnected);
+                Assert.Equal(TestNodeState.Disconnected, result);
                 Assert.True(server.IsStatesQueueEmpty());
             }
         }
@@ -321,14 +321,14 @@ namespace Interchange.Tests
                 await client.ConnectAsync();
 
                 var result = await server.ReadState();
-                Assert.Equal(result, TestNodeState.Connected);
+                Assert.Equal(TestNodeState.Connected, result);
                 Assert.True(server.IsStatesQueueEmpty());
 
                 // Dispose, not a clean disconnect
                 client.Dispose();
 
                 result = await server.ReadState();
-                Assert.Equal(result, TestNodeState.Disconnected);
+                Assert.Equal(TestNodeState.Disconnected, result);
                 Assert.True(server.IsStatesQueueEmpty());
             }
         }
@@ -342,7 +342,7 @@ namespace Interchange.Tests
                     await client.ConnectAsync();
 
                     var result = await server.ReadState();
-                    Assert.Equal(result, TestNodeState.Connected);
+                    Assert.Equal(TestNodeState.Connected, result);
                     Assert.True(server.IsStatesQueueEmpty());
 
                     // Wait 60 seconds doing nothing
@@ -431,7 +431,7 @@ namespace Interchange.Tests
         [MemberData(nameof(MessageTestPayloads))]
         public async Task SendSpamTest(byte[][] payloads, int latency, int dropPercentage) {
             using (var server = new TestNode()) {
-                using (var client = new TestNode(new TestSettings(latency, dropPercentage))) {
+                using (var client = new TestNode(new SimulationSettings(latency, dropPercentage))) {
                     server.ListenAsync();
                     await client.ConnectAsync();
 
