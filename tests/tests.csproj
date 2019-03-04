@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Interchange.Tests Class Library</Description>
+    <VersionPrefix>1.0.0-beta</VersionPrefix>
+    <Authors>Daniel Mirmilshteyn</Authors>
+    <TargetFramework>netcoreapp1.0</TargetFramework>
+    <AssemblyName>tests</AssemblyName>
+    <PackageId>tests</PackageId>
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+    <PackageProjectUrl>https://github.com/dmirmilshteyn/Interchange</PackageProjectUrl>
+    <PackageLicenseUrl>https://github.com/dmirmilshteyn/Interchange/blob/master/LICENSE.md</PackageLicenseUrl>
+    <PackageTargetFallback>$(PackageTargetFallback);portable-net451+win8;dnxcore50</PackageTargetFallback>
+    <RuntimeFrameworkVersion>1.0.4</RuntimeFrameworkVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\src\Interchange\Interchange.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.0.0-preview-20170106-08" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0-beta5-build1225" />
+    <PackageReference Include="xunit" Version="2.2.0-beta5-build3474" />
+  </ItemGroup>
+
+</Project>
